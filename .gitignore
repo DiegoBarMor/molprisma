@@ -1,0 +1,6 @@
+desktop.ini
+**/__pycache__/
+.vscode/
+
+# testdata/
+tmp/

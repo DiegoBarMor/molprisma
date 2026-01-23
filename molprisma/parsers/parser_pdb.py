@@ -1,0 +1,14 @@
+import molprisma as mp
+
+# //////////////////////////////////////////////////////////////////////////////
+class ParserPDB:
+    def __init__(self, path_pdb):
+        self.mol = mp.MolData()
+
+        with open(path_pdb, 'r') as file:
+            data = file.read().strip()
+
+        self.mol.text = data
+
+
+# //////////////////////////////////////////////////////////////////////////////
