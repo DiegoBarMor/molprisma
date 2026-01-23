@@ -5,7 +5,7 @@ import molprisma as mp
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 def main():
-    mol = mp.ParserPDB(PATH_STRUCT).mol
+    mol = mp.ParserPDB(PATH_STRUCT).parse()
     mp.TUIMolPrisma(mol).run()
 
 
