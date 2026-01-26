@@ -4,13 +4,15 @@ import molprisma as mp
 
 # //////////////////////////////////////////////////////////////////////////////
 class MolKind(Enum):
+    NONE = auto()
     META = auto()
-    DATA = auto()
+    ATOM = auto()
+    HETE = auto()
 
 
 # //////////////////////////////////////////////////////////////////////////////
 class MolLine:
-    def __init__(self, text: str, kind: "mp.LineKind"):
+    def __init__(self, text: str, kind: "mp.MolKind"):
         self.text = text
         self.kind = kind
 

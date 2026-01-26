@@ -11,6 +11,10 @@ class MolData:
         return len(self._lines)
 
     # --------------------------------------------------------------------------
+    def append(self, line: mp.MolLine):
+        self._lines.append(line)
+
+    # --------------------------------------------------------------------------
     def extend(self, lines: list[mp.MolLine]):
         self._lines.extend(lines)
 
@@ -27,12 +31,9 @@ class MolData:
         return sum(filterkey(line) for line in self._lines)
 
     # --------------------------------------------------------------------------
-    def iter_lines(self, nlines: int = None, filterkey: callable = None):
+    def iter_lines(self, filterkey: callable, nlines: int = None):
         if nlines is None:
             nlines = len(self._lines) - self.pos
-
-        if filterkey is None:
-            filterkey = lambda _: True
 
         lines = tuple(
             filter(filterkey, self._lines)

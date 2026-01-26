@@ -2,7 +2,8 @@ import molprisma as mp
 
 # //////////////////////////////////////////////////////////////////////////////
 class ParserPDB:
-    KEYWORDS_DATA = ("ATOM", "HETATM")
+    KEYWORD_ATOM = "ATOM"
+    KEYWORD_HETA = "HETATM"
 
     # --------------------------------------------------------------------------
     def __init__(self, path_pdb):
@@ -12,8 +13,10 @@ class ParserPDB:
     # --------------------------------------------------------------------------
     def parse(self) -> mp.MolData:
         def get_kind(line: str) -> mp.MolKind:
-            if line.startswith(self.KEYWORDS_DATA):
-                return mp.MolKind.DATA
+            if line.startswith(self.KEYWORD_ATOM):
+                return mp.MolKind.ATOM
+            if line.startswith(self.KEYWORD_HETA):
+                return mp.MolKind.HETE
             return mp.MolKind.META
 
         mol = mp.MolData()
@@ -21,6 +24,7 @@ class ParserPDB:
             mp.MolLine(line.rstrip('\n'), get_kind(line))
             for line in self._raw
         ])
+        mol.append(mp.MolLine('', mp.MolKind.NONE))
         mol.pad_lines()
         return mol
 
