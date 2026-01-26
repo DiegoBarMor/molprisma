@@ -11,19 +11,16 @@ class ParserPDB:
 
     # --------------------------------------------------------------------------
     def parse(self) -> mp.MolData:
-        mol = mp.MolData()
+        def get_kind(line: str) -> mp.MolKind:
+            if line.startswith(self.KEYWORDS_DATA):
+                return mp.MolKind.DATA
+            return mp.MolKind.META
 
-        mask = [line.startswith(self.KEYWORDS_DATA) for line in self._raw]
-        data = [
-            mp.MolLine(line.rstrip('\n'), mp.MolKind.DATA)
-            for line,m in zip(self._raw, mask) if m
-        ]
-        meta = [
-            mp.MolLine(line.rstrip('\n'), mp.MolKind.META)
-            for line,m in zip(self._raw, mask) if not m
-        ]
-        mol.extend_meta(meta)
-        mol.extend_data(data)
+        mol = mp.MolData()
+        mol.extend([
+            mp.MolLine(line.rstrip('\n'), get_kind(line))
+            for line in self._raw
+        ])
         mol.pad_lines()
         return mol
 

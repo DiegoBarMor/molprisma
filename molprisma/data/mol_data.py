@@ -4,29 +4,41 @@ import molprisma as mp
 class MolData:
     def __init__(self):
         self.pos = 0
-        self._all_lines: list[mp.MolLine] = []
-        self._meta: list[mp.MolLine] = []
-        self._data: list[mp.MolLine] = []
+        self._lines: list[mp.MolLine] = []
 
     # --------------------------------------------------------------------------
-    def extend_meta(self, lines: list[str]):
-        self._all_lines.extend(lines)
-        self._meta.extend(lines)
+    def __len__(self):
+        return len(self._lines)
 
     # --------------------------------------------------------------------------
-    def extend_data(self, lines: list[str]):
-        self._all_lines.extend(lines)
-        self._data.extend(lines)
+    def extend(self, lines: list[mp.MolLine]):
+        self._lines.extend(lines)
 
     # --------------------------------------------------------------------------
     def pad_lines(self):
-        max_line_length = max(len(line.text) for line in self._all_lines)
-        for line in self._all_lines:
+        max_line_length = max(len(line.text) for line in self._lines)
+        for line in self._lines:
             line.text = line.text.ljust(max_line_length)
 
     # --------------------------------------------------------------------------
-    def iter_lines(self, nlines: int):
-        for line in self._all_lines[self.pos:self.pos+nlines]:
+    def count_lines(self, filterkey: callable = None) -> int:
+        if filterkey is None:
+            filterkey = lambda _: 1
+        return sum(filterkey(line) for line in self._lines)
+
+    # --------------------------------------------------------------------------
+    def iter_lines(self, nlines: int = None, filterkey: callable = None):
+        if nlines is None:
+            nlines = len(self._lines) - self.pos
+
+        if filterkey is None:
+            filterkey = lambda _: True
+
+        lines = tuple(
+            filter(filterkey, self._lines)
+        )[self.pos : self.pos+nlines]
+
+        for line in lines:
             yield line
 
 
