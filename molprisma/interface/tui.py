@@ -3,22 +3,8 @@ import molprisma as mp
 
 # //////////////////////////////////////////////////////////////////////////////
 class TUIMolPrisma(pr.Terminal):
-    IDX_PAIR_NONE = 1
-    IDX_PAIR_META = 2
-    IDX_PAIR_ATOM = 3
-    IDX_PAIR_HETA = 4
-    IDX_PAIR_HELP = 5
-    IDX_PAIR_HELP_0 = 6
-    IDX_PAIR_HELP_1 = 7
-    NLINES_FAST_SCROLL = 10
-
     COLOR_GRAY = 8
-    KEY_A = ord('a')
-    KEY_C = ord('c')
-    KEY_H = ord('h')
-    KEY_Q = ord('q')
-    KEY_X = ord('x')
-    KEY_Z = ord('z')
+    NLINES_FAST_SCROLL = 10
     KEY_CTRL_HOME = 540 # [TODO] test this
     KEY_CTRL_END = 535
 
@@ -35,35 +21,32 @@ class TUIMolPrisma(pr.Terminal):
 
     # --------------------------------------------------------------------------
     def on_start(self):
-        pr.init_pair(self.IDX_PAIR_NONE,   pr.COLOR_WHITE, pr.COLOR_RED)
-        pr.init_pair(self.IDX_PAIR_META,   pr.COLOR_WHITE, self.COLOR_GRAY)
-        pr.init_pair(self.IDX_PAIR_ATOM,   pr.COLOR_BLACK, pr.COLOR_YELLOW)
-        pr.init_pair(self.IDX_PAIR_HETA,   pr.COLOR_BLACK, pr.COLOR_GREEN)
-        pr.init_pair(self.IDX_PAIR_HELP  , pr.COLOR_BLACK, pr.COLOR_CYAN)
-        pr.init_pair(self.IDX_PAIR_HELP_0, pr.COLOR_WHITE, pr.COLOR_RED)
-        pr.init_pair(self.IDX_PAIR_HELP_1, pr.COLOR_WHITE, pr.COLOR_GREEN)
-
-        self.pair_none   = pr.get_color_pair(self.IDX_PAIR_NONE)
-        self.pair_meta   = pr.get_color_pair(self.IDX_PAIR_META)
-        self.pair_atom   = pr.get_color_pair(self.IDX_PAIR_ATOM)
-        self.pair_hete   = pr.get_color_pair(self.IDX_PAIR_HETA)
-        self.pair_help   = pr.get_color_pair(self.IDX_PAIR_HELP)
-        self.pair_help_0 = pr.get_color_pair(self.IDX_PAIR_HELP_0)
-        self.pair_help_1 = pr.get_color_pair(self.IDX_PAIR_HELP_1)
+        self.pair_none   = pr.init_pair(1, pr.COLOR_WHITE, pr.COLOR_RED)
+        self.pair_meta   = pr.init_pair(2, pr.COLOR_WHITE, self.COLOR_GRAY)
+        self.pair_atom   = pr.init_pair(3, pr.COLOR_BLACK, pr.COLOR_YELLOW)
+        self.pair_hete   = pr.init_pair(4, pr.COLOR_BLACK, pr.COLOR_GREEN)
+        self.pair_help   = pr.init_pair(5, pr.COLOR_BLACK, pr.COLOR_CYAN)
+        self.pair_help_0 = pr.init_pair(6, pr.COLOR_WHITE, pr.COLOR_RED)
+        self.pair_help_1 = pr.init_pair(7, pr.COLOR_BLACK, pr.COLOR_GREEN)
 
 
     # --------------------------------------------------------------------------
     def on_update(self):
         match self.key:
-            case pr.KEY_UP:    self._scroll_up(1)
-            case pr.KEY_DOWN:  self._scroll_down(1)
-            case pr.KEY_PPAGE: self._scroll_up(self.NLINES_FAST_SCROLL)
-            case pr.KEY_NPAGE: self._scroll_down(self.NLINES_FAST_SCROLL)
-            case self.KEY_H:         self._show_help()
-            case self.KEY_A:         self._toggle_all()
-            case self.KEY_Z:         self._toggle_atom()
-            case self.KEY_X:         self._toggle_hete()
-            case self.KEY_C:         self._toggle_meta()
+            case pr.KEY_UP:      self._scroll_up(1)
+            case pr.KEY_DOWN:    self._scroll_down(1)
+            case pr.KEY_PPAGE:   self._scroll_up(self.NLINES_FAST_SCROLL)
+            case pr.KEY_NPAGE:   self._scroll_down(self.NLINES_FAST_SCROLL)
+            case pr.KEY_H_LOWER: self._help_screen()
+            case pr.KEY_H_UPPER: self._help_screen()
+            case pr.KEY_A_LOWER: self._toggle_all()
+            case pr.KEY_A_UPPER: self._toggle_all()
+            case pr.KEY_Z_LOWER: self._toggle_atom()
+            case pr.KEY_Z_UPPER: self._toggle_atom()
+            case pr.KEY_X_LOWER: self._toggle_hete()
+            case pr.KEY_X_UPPER: self._toggle_hete()
+            case pr.KEY_C_LOWER: self._toggle_meta()
+            case pr.KEY_C_UPPER: self._toggle_meta()
             case self.KEY_CTRL_HOME: self._scroll_up(float("inf"))
             case self.KEY_CTRL_END:  self._scroll_down(float("inf"))
 
@@ -74,21 +57,31 @@ class TUIMolPrisma(pr.Terminal):
         chars = [line.text for line in lines]
         attrs = [self._get_attr_array(line) for line in lines]
 
-        self.root.draw_matrix(0, 0, chars, attrs)
-        self._draw_guides()
+        self.draw_matrix(0, 0, chars, attrs)
+        self._draw_guides(w = len(self._mol._lines[0].text))
 
 
     # --------------------------------------------------------------------------
     def should_stop(self):
-        return self.key == self.KEY_Q
+        return self.key == pr.KEY_Q_LOWER or self.key == pr.KEY_Q_UPPER
 
 
     # --------------------------------------------------------------------------
-    def _draw_guides(self):
+    def _draw_guides(self, w: int):
+        def choose_pair(show: bool) -> int:
+            return self.pair_help_1 if show else self.pair_help_0
+
+        self.draw_text(-2, 'l', '-'*w, pr.A_BOLD)
+        show_all = self._show_atom and self._show_hete and self._show_meta
+
         x = 0
-        self.draw_text(-2, 0, '-'*self.w, pr.A_BOLD)
-        self.draw_text('b', x, "q: quit", self.pair_help)
-        ...
+        x += self.draw_text('b', x, "q: quit", self.pair_help) + 1
+        # x += self.draw_text('b', x, "h: help", self.pair_help) + 1
+        x += self.draw_text('b', x, "a: all",      choose_pair(show_all)) + 1
+        x += self.draw_text('b', x, "z: atoms",    choose_pair(self._show_atom)) + 1
+        x += self.draw_text('b', x, "x: hetatms",  choose_pair(self._show_hete)) + 1
+        x += self.draw_text('b', x, "c: metadata", choose_pair(self._show_meta)) + 1
+        self.draw_text('b', x, '.'*(w - x), pr.A_DIM)
 
 
     # --------------------------------------------------------------------------
@@ -103,8 +96,8 @@ class TUIMolPrisma(pr.Terminal):
 
 
     # --------------------------------------------------------------------------
-    def _show_help(self):
-        ...
+    def _help_screen(self):
+        ... # [TODO]
 
 
     # --------------------------------------------------------------------------
@@ -169,7 +162,6 @@ class TUIMolPrisma(pr.Terminal):
             if not self._filter_key(line): continue
             self._mol.pos = idx
             return
-
 
 
 # //////////////////////////////////////////////////////////////////////////////
