@@ -1,4 +1,6 @@
-from .data.mol_line import MolKind, MolLine
+from .misc.enums import MolKind, ColorBy
+
+from .data.mol_line import MolLine
 from .data.mol_data import MolData
 
 from .parsers.parser_pdb import ParserPDB

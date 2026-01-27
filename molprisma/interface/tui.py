@@ -18,6 +18,7 @@ class TUIMolPrisma(pr.Terminal):
         self._show_atom = True
         self._show_hete = True
         self._show_meta = True
+        self._color_by = mp.ColorBy.ROW
 
         self._filter_key: callable[mp.MolLine] = lambda _: True
 
@@ -52,12 +53,12 @@ class TUIMolPrisma(pr.Terminal):
             case pr.KEY_H_UPPER: self._help_screen()
             case pr.KEY_A_LOWER: self._toggle_all()
             case pr.KEY_A_UPPER: self._toggle_all()
-            case pr.KEY_Z_LOWER: self._toggle_atom()
-            case pr.KEY_Z_UPPER: self._toggle_atom()
-            case pr.KEY_X_LOWER: self._toggle_hete()
-            case pr.KEY_X_UPPER: self._toggle_hete()
-            case pr.KEY_C_LOWER: self._toggle_meta()
-            case pr.KEY_C_UPPER: self._toggle_meta()
+            case pr.KEY_S_LOWER: self._toggle_atom()
+            case pr.KEY_S_UPPER: self._toggle_atom()
+            case pr.KEY_D_LOWER: self._toggle_hete()
+            case pr.KEY_D_UPPER: self._toggle_hete()
+            case pr.KEY_F_LOWER: self._toggle_meta()
+            case pr.KEY_F_UPPER: self._toggle_meta()
             case self.KEY_CTRL_HOME: self._scroll_up(float("inf"))
             case self.KEY_CTRL_END:  self._scroll_down(float("inf"))
 
@@ -69,12 +70,9 @@ class TUIMolPrisma(pr.Terminal):
         attrs = [self._get_attr_array(line) for line in lines]
 
         self.lsect.draw_matrix(1, 1, chars, attrs)
+        self._draw_borders()
         self._draw_guides_top()
-
-        self.lsect_body.draw_border()
-        self.rsect.draw_border()
-        self.lsect_body.draw_text(0, 2, f" Molecule: {self._mol.name} ", pr.A_BOLD)
-
+        self._draw_guides_bottom()
 
     # --------------------------------------------------------------------------
     def should_stop(self):
@@ -83,26 +81,37 @@ class TUIMolPrisma(pr.Terminal):
 
     # --------------------------------------------------------------------------
     def _draw_guides_top(self):
-        def choose_pair(show: bool) -> int:
-            return self.pair_help_1 if show else self.pair_help_0
-
-        sect = self.lsect_footer
         show_all = self._show_atom and self._show_hete and self._show_meta
-        guides = (
-            ("q: quit", self.pair_help),
-            ("a: all", choose_pair(show_all)),
-            ("z: atoms", choose_pair(self._show_atom)),
-            ("x: hetatms", choose_pair(self._show_hete)),
-            ("c: metadata", choose_pair(self._show_meta)),
+        self.lsect_footer.draw_matrix(0, 2,
+            *self._get_guides_matrices(guides = (
+                ("filter→ ",  None),
+                ("a: all",      show_all),
+                ("s: atoms",    self._show_atom),
+                ("d: hetatms",  self._show_hete),
+                ("f: metadata", self._show_meta),
+            ))
         )
+        self.lsect_footer.draw_text(0, "r-2", "[h]elp", self.pair_help)
 
-        chars = "  ".join(f"{text}" for text, _ in guides)
-        attrs = []
-        for text, pair in guides:
-            attrs.extend([pair for _ in text] + [pr.A_NORMAL, pr.A_NORMAL])
 
-        sect.draw_border(bl = '│', bs = ' ', br = '│')
-        sect.draw_matrix('t', 2, [chars], [attrs])
+    # --------------------------------------------------------------------------
+    def _draw_guides_bottom(self):
+        self.lsect_footer.draw_matrix(1, 2,
+            *self._get_guides_matrices(guides = (
+                ("color→  ",  None),
+                ("[c]olumn", self._color_by == mp.ColorBy.COLUMN),
+                ("[r]ow",    self._color_by != mp.ColorBy.COLUMN),
+            ))
+        )
+        self.lsect_footer.draw_text(0, "r-2", "[q]uit", self.pair_help)
+
+
+    # --------------------------------------------------------------------------
+    def _draw_borders(self):
+        self.rsect.draw_border()
+        self.lsect_body.draw_border()
+        self.lsect_body.draw_text(0, 2, f" Molecule: {self._mol.name} ", pr.A_BOLD)
+        self.lsect_footer.draw_border(bl = '│', bs = ' ', br = '│')
 
 
     # --------------------------------------------------------------------------
@@ -183,6 +192,18 @@ class TUIMolPrisma(pr.Terminal):
             if not self._filter_key(line): continue
             self._mol.pos = idx
             return
+
+    # --------------------------------------------------------------------------
+    def _get_guides_matrices(self, guides: list[tuple[str, bool]]) -> tuple[list[str], list[list[int]]]:
+        def choose_pair(cond: bool) -> int:
+            return self.pair_help_1 if cond else self.pair_help_0
+
+        chars = "  ".join(f"{text}" for text, _ in guides)
+        attrs = []
+        for text, condition in guides:
+            pair = self.pair_help if condition is None else choose_pair(condition)
+            attrs.extend([pair for _ in text] + [pr.A_NORMAL, pr.A_NORMAL])
+        return [chars], [attrs]
 
 
 # //////////////////////////////////////////////////////////////////////////////
