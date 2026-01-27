@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import molprisma as mp
 
 # //////////////////////////////////////////////////////////////////////////////
@@ -6,7 +8,8 @@ class ParserPDB:
     KEYWORD_HETA = "HETATM"
 
     # --------------------------------------------------------------------------
-    def __init__(self, path_pdb):
+    def __init__(self, path_pdb: str | Path):
+        self._path_pdb: Path = Path(path_pdb)
         with open(path_pdb, 'r') as file:
             self._raw = file.readlines()
 
@@ -19,7 +22,7 @@ class ParserPDB:
                 return mp.MolKind.HETE
             return mp.MolKind.META
 
-        mol = mp.MolData()
+        mol = mp.MolData(self._path_pdb.stem)
         mol.extend([
             mp.MolLine(line.rstrip('\n'), get_kind(line))
             for line in self._raw

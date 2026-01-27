@@ -2,8 +2,9 @@ import molprisma as mp
 
 # //////////////////////////////////////////////////////////////////////////////
 class MolData:
-    def __init__(self):
+    def __init__(self, name = ""):
         self.pos = 0
+        self.name = name
         self._lines: list[mp.MolLine] = []
 
     # --------------------------------------------------------------------------

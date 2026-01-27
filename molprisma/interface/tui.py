@@ -3,10 +3,13 @@ import molprisma as mp
 
 # //////////////////////////////////////////////////////////////////////////////
 class TUIMolPrisma(pr.Terminal):
-    COLOR_GRAY = 8
     NLINES_FAST_SCROLL = 10
+    PDB_WIDTH = 80
+    H_GUIDES = 2
+
     KEY_CTRL_HOME = 540 # [TODO] test this
     KEY_CTRL_END = 535
+    COLOR_GRAY = 8
 
     # --------------------------------------------------------------------------
     def __init__(self, mol_data: mp.MolData):
@@ -29,6 +32,14 @@ class TUIMolPrisma(pr.Terminal):
         self.pair_help_0 = pr.init_pair(6, pr.COLOR_WHITE, pr.COLOR_RED)
         self.pair_help_1 = pr.init_pair(7, pr.COLOR_BLACK, pr.COLOR_GREEN)
 
+        w_lsect = self.PDB_WIDTH + 2
+
+        self.lsect = self.root.create_child( 1.0,  w_lsect, 0, 0)
+        self.rsect = self.root.create_child( 1.0, -w_lsect, 0, w_lsect)
+
+        self.lsect_body   = self.lsect.create_child(-self.H_GUIDES, 1.0,  0, 0)
+        self.lsect_footer = self.lsect.create_child( self.H_GUIDES, 1.0, -1, 0)
+
 
     # --------------------------------------------------------------------------
     def on_update(self):
@@ -50,15 +61,19 @@ class TUIMolPrisma(pr.Terminal):
             case self.KEY_CTRL_HOME: self._scroll_up(float("inf"))
             case self.KEY_CTRL_END:  self._scroll_down(float("inf"))
 
-        hdisplay = self.h - 2
+        hdisplay = self.lsect_body.h - 2
         self.NLINES_FAST_SCROLL = hdisplay // 2 # dinamically adjust fast scroll based on terminal height
 
         lines = tuple(self._mol.iter_lines(self._filter_key, hdisplay))
         chars = [line.text for line in lines]
         attrs = [self._get_attr_array(line) for line in lines]
 
-        self.draw_matrix(0, 0, chars, attrs)
-        self._draw_guides(w = len(self._mol._lines[0].text))
+        self.lsect.draw_matrix(1, 1, chars, attrs)
+        self._draw_guides_top()
+
+        self.lsect_body.draw_border()
+        self.rsect.draw_border()
+        self.lsect_body.draw_text(0, 2, f" Molecule: {self._mol.name} ", pr.A_BOLD)
 
 
     # --------------------------------------------------------------------------
@@ -67,21 +82,27 @@ class TUIMolPrisma(pr.Terminal):
 
 
     # --------------------------------------------------------------------------
-    def _draw_guides(self, w: int):
+    def _draw_guides_top(self):
         def choose_pair(show: bool) -> int:
             return self.pair_help_1 if show else self.pair_help_0
 
-        self.draw_text(-2, 'l', '-'*w, pr.A_BOLD)
+        sect = self.lsect_footer
         show_all = self._show_atom and self._show_hete and self._show_meta
+        guides = (
+            ("q: quit", self.pair_help),
+            ("a: all", choose_pair(show_all)),
+            ("z: atoms", choose_pair(self._show_atom)),
+            ("x: hetatms", choose_pair(self._show_hete)),
+            ("c: metadata", choose_pair(self._show_meta)),
+        )
 
-        x = 0
-        x += self.draw_text('b', x, "q: quit", self.pair_help) + 1
-        # x += self.draw_text('b', x, "h: help", self.pair_help) + 1
-        x += self.draw_text('b', x, "a: all",      choose_pair(show_all)) + 1
-        x += self.draw_text('b', x, "z: atoms",    choose_pair(self._show_atom)) + 1
-        x += self.draw_text('b', x, "x: hetatms",  choose_pair(self._show_hete)) + 1
-        x += self.draw_text('b', x, "c: metadata", choose_pair(self._show_meta)) + 1
-        self.draw_text('b', x, '.'*(w - x), pr.A_DIM)
+        chars = "  ".join(f"{text}" for text, _ in guides)
+        attrs = []
+        for text, pair in guides:
+            attrs.extend([pair for _ in text] + [pr.A_NORMAL, pr.A_NORMAL])
+
+        sect.draw_border(bl = '│', bs = ' ', br = '│')
+        sect.draw_matrix('t', 2, [chars], [attrs])
 
 
     # --------------------------------------------------------------------------
