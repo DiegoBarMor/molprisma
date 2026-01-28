@@ -9,12 +9,20 @@ class ParserPDB:
 
     # --------------------------------------------------------------------------
     def __init__(self, path_pdb: str | Path):
-        self._path_pdb: Path = Path(path_pdb)
-        with open(path_pdb, 'r') as file:
-            self._raw = file.readlines()
+        self.path_pdb = Path(path_pdb)
+        self._mol = mp.MolData(self.path_pdb.name)
+        self._raw: list[str] = self.path_pdb.read_text().splitlines()
+
 
     # --------------------------------------------------------------------------
     def parse(self) -> mp.MolData:
+        self._mol.reset()
+        self._parse_lines()
+        return self._mol
+
+
+    # --------------------------------------------------------------------------
+    def _parse_lines(self):
         def get_kind(line: str) -> mp.MolKind:
             if line.startswith(self.KEYWORD_ATOM):
                 return mp.MolKind.ATOM
@@ -22,14 +30,13 @@ class ParserPDB:
                 return mp.MolKind.HETE
             return mp.MolKind.META
 
-        mol = mp.MolData(self._path_pdb.stem)
-        mol.extend([
+        self._mol.extend([
             mp.MolLine(line.rstrip('\n'), get_kind(line))
             for line in self._raw
         ])
-        mol.append(mp.MolLine('', mp.MolKind.NONE))
-        mol.pad_lines()
-        return mol
+        self._mol.append(mp.MolLine('', mp.MolKind.NONE))
+        self._mol.pad_lines()
+
 
 
 # //////////////////////////////////////////////////////////////////////////////
