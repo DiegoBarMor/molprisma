@@ -18,6 +18,8 @@ class ParserPDB:
     def parse(self) -> mp.MolData:
         self._mol.reset()
         self._parse_lines()
+        self._mol.init_sections()
+        self._mol.init_unique_values()
         return self._mol
 
 

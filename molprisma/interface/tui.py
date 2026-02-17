@@ -8,6 +8,7 @@ class TUIMolPrisma(pr.Terminal):
     NLINES_FAST_SCROLL = 10
     PDB_WIDTH = 80
     H_GUIDES = 2
+    H_PDB_SECTIONS = 18
 
     KEY_SCROLL_TOP    = ord('-')
     KEY_SCROLL_BOTTOM = ord('+')
@@ -35,6 +36,14 @@ class TUIMolPrisma(pr.Terminal):
             val_mask = 2 if i % 2 == 1 else 1
             self._mask_cols_alt_color[section.start:section.end] = [val_mask] * (section.end - section.start)
 
+        self._str_sections_header: str = "0-index | 1-index  | Name       "
+        self._strs_sections_body: list[str] = [
+            " | ".join((
+                section.display_idx_range(zero_indexing = True),
+                section.display_idx_range(zero_indexing = False),
+                section.name,
+            )) for section in self._mol._sections
+        ]
 
 
     # --------------------------------------------------------------------------
@@ -61,6 +70,8 @@ class TUIMolPrisma(pr.Terminal):
 
         self.lsect_body   = self.lsect.create_child(-self.H_GUIDES, 1.0,  0, 0)
         self.lsect_footer = self.lsect.create_child( self.H_GUIDES, 1.0, -1, 0)
+        self.rsect_top    = self.rsect.create_child( self.H_PDB_SECTIONS, 1.0, 0, 0)
+        self.rsect_bottom = self.rsect.create_child(-self.H_PDB_SECTIONS, 1.0, self.H_PDB_SECTIONS, 0)
 
 
     # --------------------------------------------------------------------------
@@ -97,14 +108,15 @@ class TUIMolPrisma(pr.Terminal):
         self._draw_guides_top()
         self._draw_guides_bottom()
 
-        self.rsect.draw_text(1, 2, "PDB Sections:", pr.A_BOLD)
-        self.rsect.draw_text(2, 2, "0-index | 1-index  | Name       ", pr.A_UNDERLINE)
-        for i,section in enumerate(self._mol._sections):
-            # [WIP] initialize strings only once?
-            self.rsect.draw_text(3+i, 2,
-                f"{section.display_idx_range(zero_indexing = True)} | {section.display_idx_range(zero_indexing = False)} | {section.name}",
+        self.rsect_top.draw_text(1, 2, self._str_sections_header, pr.A_UNDERLINE)
+        for i,chars in enumerate(self._strs_sections_body):
+            self.rsect_top.draw_text(2+i, 2, chars,
                 attr = pr.A_REVERSE if i == self._mol.current_section else pr.A_NORMAL
             )
+
+        self.rsect_bottom.draw_text(1, 2, f"Chains:   {self._mol.unique_chains  }")
+        self.rsect_bottom.draw_text(2, 2, f"Elements: {self._mol.unique_elements}")
+        self.rsect_bottom.draw_text(3, 2, f"Resnames: {self._mol.unique_resnames}")
 
 
     # --------------------------------------------------------------------------
@@ -117,7 +129,7 @@ class TUIMolPrisma(pr.Terminal):
         show_all = self._show_atom and self._show_hete and self._show_meta
         self.lsect_footer.draw_matrix(0, 2,
             *self._get_guides_matrices(guides = (
-                ("toggle→ ",    None),
+                ("toggle...",    None),
                 ("a: all",      show_all),
                 ("s: atoms",    self._show_atom),
                 ("d: hetatms",  self._show_hete),
@@ -131,12 +143,12 @@ class TUIMolPrisma(pr.Terminal):
     def _draw_guides_bottom(self):
         self.lsect_footer.draw_matrix(1, 2,
             *self._get_guides_matrices(guides = (
-                ("move→  ", None),
-                ("↑/↓: rows", self.key in (pr.KEY_UP, pr.KEY_DOWN)),
-                ("←/→: cols", self.key in (pr.KEY_LEFT, pr.KEY_RIGHT)),
-                ("PPage/NPage: fast scroll",  self.key in (pr.KEY_PPAGE, pr.KEY_NPAGE)),
-                ("-: top", self.key == self.KEY_SCROLL_TOP),
-                ("+: end", self.key == self.KEY_SCROLL_BOTTOM),
+                ("move...", None),
+                ("↑/↓: rows", None),
+                ("←/→: cols", None),
+                ("PPage/NPage: fast scroll",  None),
+                ("-: top", None),
+                ("+: end", None),
             ))
         )
         self.lsect_footer.draw_text(0, "r-2", "[q]uit", self.pair_help)
@@ -144,10 +156,16 @@ class TUIMolPrisma(pr.Terminal):
 
     # --------------------------------------------------------------------------
     def _draw_borders(self):
-        self.rsect.draw_border()
         self.lsect_body.draw_border()
         self.lsect_body.draw_text(0, 2, f" {self._mol.name} ", pr.A_BOLD)
+
         self.lsect_footer.draw_border(bl = '│', bs = ' ', br = '│')
+
+        self.rsect_top.draw_border()
+        self.rsect_top.draw_text(0, 2, " PDB Sections ", pr.A_BOLD)
+
+        self.rsect_bottom.draw_border()
+        self.rsect_bottom.draw_text(0, 2, " Unique Values ", pr.A_BOLD)
 
 
     # --------------------------------------------------------------------------

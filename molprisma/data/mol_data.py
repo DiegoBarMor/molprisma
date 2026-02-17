@@ -9,6 +9,10 @@ class MolData:
         self.nsections = 0
         self.current_line: int = 0 # a.k.a row
         self.current_section: int | None = None # a.k.a column
+        self.unique_chains:   list[str] = []
+        self.unique_elements: list[str] = []
+        self.unique_resnames: list[str] = []
+
         self._idxs_chars2idxs_sects = [None for _ in range(ms.LENGTH_RECORD)]
         self._lines: list[mp.MolLine] = []
         self._sections: list[mp.PDBSection] = []
@@ -22,9 +26,11 @@ class MolData:
         self.current_line = 0
         self.current_section = None
         self._idxs_chars2idxs_sects = [None for _ in range(ms.LENGTH_RECORD)]
+        self.unique_chains.clear()
+        self.unique_elements.clear()
+        self.unique_resnames.clear()
         self._lines.clear()
         self._sections.clear()
-        self._init_sections()
 
     # --------------------------------------------------------------------------
     def append(self, line: mp.MolLine):
@@ -69,7 +75,7 @@ class MolData:
         return self._idxs_chars2idxs_sects[idx_char]
 
     # --------------------------------------------------------------------------
-    def _init_sections(self):
+    def init_sections(self):
         constants = ms.get_pdb_constants()
         keys = set(k[:-4] for k in constants.keys() if k.endswith("_END"))
         for key in keys:
@@ -83,6 +89,18 @@ class MolData:
 
         for i,section in enumerate(self._sections):
             self._idxs_chars2idxs_sects[section.start:section.end] = [i] * (section.end - section.start)
+
+    # --------------------------------------------------------------------------
+    def init_unique_values(self):
+        self.unique_chains = list(sorted(set(
+            line.get_section_data("CHAIN_ID") for line in self._lines
+        ) - {None}))
+        self.unique_elements = list(sorted(set(
+            line.get_section_data("ELEMENT_SYMBOL") for line in self._lines
+        ) - {None}))
+        self.unique_resnames = list(sorted(set(
+            line.get_section_data("RESIDUE_NAME") for line in self._lines
+        ) - {None}))
 
 
 # //////////////////////////////////////////////////////////////////////////////
