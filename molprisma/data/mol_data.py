@@ -1,4 +1,5 @@
 import molsimple as ms
+import prismatui as pr
 
 import molprisma as mp
 
@@ -9,9 +10,13 @@ class MolData:
         self.nsections = 0
         self.current_line: int = 0 # a.k.a row
         self.current_section: int | None = None # a.k.a column
-        self.unique_chains:   list[str] = []
-        self.unique_elements: list[str] = []
-        self.unique_resnames: list[str] = []
+
+        self._unique_vals: dict[str, list[str]] = {
+            "chains" : [], "elements" : [], "resnames" : [],
+        }
+        self._idx_unique_current: dict[str, list[str]] = {
+            "chains" : 0,  "elements" : 0,  "resnames" : 0,
+        }
 
         self._idxs_chars2idxs_sects = [None for _ in range(ms.LENGTH_RECORD)]
         self._lines: list[mp.MolLine] = []
@@ -26,11 +31,38 @@ class MolData:
         self.current_line = 0
         self.current_section = None
         self._idxs_chars2idxs_sects = [None for _ in range(ms.LENGTH_RECORD)]
-        self.unique_chains.clear()
-        self.unique_elements.clear()
-        self.unique_resnames.clear()
+        for v in self._unique_vals.values(): v.clear()
         self._lines.clear()
         self._sections.clear()
+
+    # --------------------------------------------------------------------------
+    def init_sections(self):
+        constants = ms.get_pdb_constants()
+        keys = set(k[:-4] for k in constants.keys() if k.endswith("_END"))
+        for key in keys:
+            start = constants.get(f"{key}_START", None)
+            end   = constants.get(f"{key}_END",   None)
+            if start is None or end is None: continue
+            self._sections.append(mp.PDBSection(key, start, end))
+
+        self._sections.sort(key = lambda s: s.start)
+        self.nsections = len(self._sections)
+
+        for i,section in enumerate(self._sections):
+            self._idxs_chars2idxs_sects[section.start:section.end] = [i] * (section.end - section.start)
+
+    # --------------------------------------------------------------------------
+    def init_unique_values(self):
+        keys = (
+            ("chains", "CHAIN_ID"),
+            ("elements", "ELEMENT_SYMBOL"),
+            ("resnames", "RESIDUE_NAME"),
+        )
+        for k,name_section in keys:
+            self._unique_vals[k] = list(sorted(set(
+                line.get_section_data(name_section) for line in self._lines
+            ) - {None}))
+
 
     # --------------------------------------------------------------------------
     def append(self, line: mp.MolLine):
@@ -75,32 +107,26 @@ class MolData:
         return self._idxs_chars2idxs_sects[idx_char]
 
     # --------------------------------------------------------------------------
-    def init_sections(self):
-        constants = ms.get_pdb_constants()
-        keys = set(k[:-4] for k in constants.keys() if k.endswith("_END"))
-        for key in keys:
-            start = constants.get(f"{key}_START", None)
-            end   = constants.get(f"{key}_END",   None)
-            if start is None or end is None: continue
-            self._sections.append(mp.PDBSection(key, start, end))
-
-        self._sections.sort(key = lambda s: s.start)
-        self.nsections = len(self._sections)
-
-        for i,section in enumerate(self._sections):
-            self._idxs_chars2idxs_sects[section.start:section.end] = [i] * (section.end - section.start)
+    def increment_idx_unique_current(self, key: str):
+        assert key in self._unique_vals, f"Invalid key for MolData's unique chars: {key}"
+        vals = self._unique_vals[key]
+        idx = self._idx_unique_current[key] + 1
+        if idx >= len(vals): idx = 0
+        self._idx_unique_current[key] = idx
 
     # --------------------------------------------------------------------------
-    def init_unique_values(self):
-        self.unique_chains = list(sorted(set(
-            line.get_section_data("CHAIN_ID") for line in self._lines
-        ) - {None}))
-        self.unique_elements = list(sorted(set(
-            line.get_section_data("ELEMENT_SYMBOL") for line in self._lines
-        ) - {None}))
-        self.unique_resnames = list(sorted(set(
-            line.get_section_data("RESIDUE_NAME") for line in self._lines
-        ) - {None}))
+    def get_unique_chars_attrs(self, key: str) -> tuple[str, list[int]]:
+        assert key in self._unique_vals, f"Invalid key for MolData's unique chars: {key}"
+        vals = self._unique_vals[key]
+        idx = self._idx_unique_current[key]
+
+        chars = '"' + '" "'.join(vals) + '"'
+        mask = ' '.join( # maybe not the most readable way to do this, but it works nicely
+            f"!{'!'*len(v)}!" if idx == i else f" {' '*len(v)} "
+            for i,v in enumerate(vals)
+        )
+        attrs = [[pr.A_REVERSE if m == '!' else pr.A_NORMAL for m in mask]]
+        return chars, attrs
 
 
 # //////////////////////////////////////////////////////////////////////////////

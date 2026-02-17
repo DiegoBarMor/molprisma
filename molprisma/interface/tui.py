@@ -83,8 +83,6 @@ class TUIMolPrisma(pr.Terminal):
             case pr.KEY_RIGHT:   self._next_column()
             case pr.KEY_PPAGE:   self._scroll_up(self.NLINES_FAST_SCROLL)
             case pr.KEY_NPAGE:   self._scroll_down(self.NLINES_FAST_SCROLL)
-            case pr.KEY_H_LOWER: self._help_screen()
-            case pr.KEY_H_UPPER: self._help_screen()
             case pr.KEY_A_LOWER: self._toggle_all()
             case pr.KEY_A_UPPER: self._toggle_all()
             case pr.KEY_S_LOWER: self._toggle_atom()
@@ -93,6 +91,12 @@ class TUIMolPrisma(pr.Terminal):
             case pr.KEY_D_UPPER: self._toggle_hete()
             case pr.KEY_F_LOWER: self._toggle_meta()
             case pr.KEY_F_UPPER: self._toggle_meta()
+            case pr.KEY_C_LOWER: self._next_chain()
+            case pr.KEY_C_UPPER: self._next_chain()
+            case pr.KEY_E_LOWER: self._next_element()
+            case pr.KEY_E_UPPER: self._next_element()
+            case pr.KEY_R_LOWER: self._next_resname()
+            case pr.KEY_R_UPPER: self._next_resname()
             case self.KEY_SCROLL_TOP:    self._scroll_up(float("inf"))
             case self.KEY_SCROLL_BOTTOM: self._scroll_down(float("inf"))
 
@@ -114,9 +118,10 @@ class TUIMolPrisma(pr.Terminal):
                 attr = pr.A_REVERSE if i == self._mol.current_section else pr.A_NORMAL
             )
 
-        self.rsect_bottom.draw_text(1, 2, f"Chains:   {self._mol.unique_chains  }")
-        self.rsect_bottom.draw_text(2, 2, f"Elements: {self._mol.unique_elements}")
-        self.rsect_bottom.draw_text(3, 2, f"Resnames: {self._mol.unique_resnames}")
+        for i,k in enumerate(("chains", "elements", "resnames"), start = 1):
+            chars, attrs = self._mol.get_unique_chars_attrs(k)
+            self.rsect_bottom.draw_text(i, 2, f"{k}:")
+            self.rsect_bottom.draw_text(i, 12, chars, attrs)
 
 
     # --------------------------------------------------------------------------
@@ -129,11 +134,12 @@ class TUIMolPrisma(pr.Terminal):
         show_all = self._show_atom and self._show_hete and self._show_meta
         self.lsect_footer.draw_matrix(0, 2,
             *self._get_guides_matrices(guides = (
-                ("toggle...",    None),
-                ("a: all",      show_all),
-                ("s: atoms",    self._show_atom),
-                ("d: hetatms",  self._show_hete),
-                ("f: metadata", self._show_meta),
+                ("toggle...",     None),
+                ("a: all",        show_all),
+                ("s: atoms",      self._show_atom),
+                ("d: hetatms",    self._show_hete),
+                ("f: metadata",   self._show_meta),
+                ("c/e/r: unique", False)
             ))
         )
         self.lsect_footer.draw_text(0, "r-2", "[h]elp", self.pair_help)
@@ -197,11 +203,6 @@ class TUIMolPrisma(pr.Terminal):
 
 
     # --------------------------------------------------------------------------
-    def _help_screen(self):
-        ... # [TODO]
-
-
-    # --------------------------------------------------------------------------
     def _toggle_all(self):
         self._show_meta = not self._show_meta
         self._show_atom = not self._show_atom
@@ -229,6 +230,21 @@ class TUIMolPrisma(pr.Terminal):
         self._show_hete = not self._show_hete
         self._update_filter_key()
         self._update_pos()
+
+
+    # --------------------------------------------------------------------------
+    def _next_chain(self):
+        self._mol.increment_idx_unique_current("chains")
+
+
+    # --------------------------------------------------------------------------
+    def _next_element(self):
+        self._mol.increment_idx_unique_current("elements")
+
+
+    # --------------------------------------------------------------------------
+    def _next_resname(self):
+        self._mol.increment_idx_unique_current("resnames")
 
 
     # --------------------------------------------------------------------------
