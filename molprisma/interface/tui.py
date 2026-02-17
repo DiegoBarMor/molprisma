@@ -23,7 +23,6 @@ class TUIMolPrisma(pr.Terminal):
         self._show_atom = True
         self._show_hete = True
         self._show_meta = True
-        self._color_by = mp.ColorBy.ROWTYPE
         self._filter_key: callable[mp.MolLine] = lambda _: True
 
         ### this mask is used in TUIMolPrisma._get_attr_array for choosing appropriate column colors
@@ -41,7 +40,7 @@ class TUIMolPrisma(pr.Terminal):
     # --------------------------------------------------------------------------
     def on_start(self):
         pr.init_color(self.COLOR_GRAY, 400, 400, 400)
-        pr.init_color(self.COLOR_YELLOW_SOFT, 700, 700, 200)
+        pr.init_color(self.COLOR_YELLOW_SOFT, 700, 700, 300)
         pr.init_color(self.COLOR_GREEN_SOFT, 200, 500, 200)
         self.pair_none = pr.init_pair(1, pr.COLOR_WHITE, pr.COLOR_RED)
         self.pair_meta = pr.init_pair(2, pr.COLOR_WHITE, self.COLOR_GRAY)
@@ -83,10 +82,6 @@ class TUIMolPrisma(pr.Terminal):
             case pr.KEY_D_UPPER: self._toggle_hete()
             case pr.KEY_F_LOWER: self._toggle_meta()
             case pr.KEY_F_UPPER: self._toggle_meta()
-            case pr.KEY_R_LOWER: self._color_by = mp.ColorBy.ROWTYPE
-            case pr.KEY_R_UPPER: self._color_by = mp.ColorBy.ROWTYPE
-            case pr.KEY_C_LOWER: self._color_by = mp.ColorBy.COLUMN
-            case pr.KEY_C_UPPER: self._color_by = mp.ColorBy.COLUMN
             case self.KEY_SCROLL_TOP:    self._scroll_up(float("inf"))
             case self.KEY_SCROLL_BOTTOM: self._scroll_down(float("inf"))
 
@@ -136,9 +131,12 @@ class TUIMolPrisma(pr.Terminal):
     def _draw_guides_bottom(self):
         self.lsect_footer.draw_matrix(1, 2,
             *self._get_guides_matrices(guides = (
-                ("color→  ", None),
-                ("[c]olumn", self._color_by == mp.ColorBy.COLUMN),
-                ("[r]ow",    self._color_by == mp.ColorBy.ROWTYPE),
+                ("move→  ", None),
+                ("↑/↓: rows", self.key in (pr.KEY_UP, pr.KEY_DOWN)),
+                ("←/→: cols", self.key in (pr.KEY_LEFT, pr.KEY_RIGHT)),
+                ("PPage/NPage: fast scroll",  self.key in (pr.KEY_PPAGE, pr.KEY_NPAGE)),
+                ("-: top", self.key == self.KEY_SCROLL_TOP),
+                ("+: end", self.key == self.KEY_SCROLL_BOTTOM),
             ))
         )
         self.lsect_footer.draw_text(0, "r-2", "[q]uit", self.pair_help)

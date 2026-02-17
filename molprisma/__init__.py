@@ -1,4 +1,4 @@
-from .misc.enums import MolKind, ColorBy
+from .misc.enums import MolKind
 
 from .data.pdb_section import PDBSection
 from .data.mol_line import MolLine
