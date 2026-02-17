@@ -5,11 +5,19 @@ import molprisma as mp
 
 # //////////////////////////////////////////////////////////////////////////////
 class MolData:
+    UNIQUE_VALS_KEYS = {
+        "chains": "CHAIN_ID",
+        "elements": "ELEMENT_SYMBOL",
+        "resnames": "RESIDUE_NAME",
+    }
+
+    # --------------------------------------------------------------------------
     def __init__(self, name = ""):
         self.name: str = name
         self.nsections = 0
         self.current_line: int = 0 # a.k.a row
         self.current_section: int | None = None # a.k.a column
+        self.current_unique: str | None = None # can be set to a unique value name to show only that one (i.e. "chains")
 
         self._unique_vals: dict[str, list[str]] = {
             "chains" : [], "elements" : [], "resnames" : [],
@@ -53,12 +61,7 @@ class MolData:
 
     # --------------------------------------------------------------------------
     def init_unique_values(self):
-        keys = (
-            ("chains", "CHAIN_ID"),
-            ("elements", "ELEMENT_SYMBOL"),
-            ("resnames", "RESIDUE_NAME"),
-        )
-        for k,name_section in keys:
+        for k,name_section in self.UNIQUE_VALS_KEYS.items():
             self._unique_vals[k] = list(sorted(set(
                 line.get_section_data(name_section) for line in self._lines
             ) - {None}))
@@ -107,26 +110,52 @@ class MolData:
         return self._idxs_chars2idxs_sects[idx_char]
 
     # --------------------------------------------------------------------------
-    def increment_idx_unique_current(self, key: str):
-        assert key in self._unique_vals, f"Invalid key for MolData's unique chars: {key}"
+    def increment_idx_unique_current(self):
+        key = self.current_unique
+        self._assert_key(key)
+
         vals = self._unique_vals[key]
         idx = self._idx_unique_current[key] + 1
         if idx >= len(vals): idx = 0
         self._idx_unique_current[key] = idx
 
     # --------------------------------------------------------------------------
+    def match_current_unique_char(self, line: mp.MolLine) -> bool:
+        key = self.current_unique
+        self._assert_key(key)
+
+        vals = self._unique_vals[key]
+        idx = self._idx_unique_current[key]
+        ref = vals[idx]
+
+        key_pdb_section = self.UNIQUE_VALS_KEYS[self.current_unique]
+        to_evaluate = line.get_section_data(key_pdb_section)
+        if to_evaluate is None: return False
+
+        return to_evaluate.strip() == ref
+
+    # --------------------------------------------------------------------------
     def get_unique_chars_attrs(self, key: str) -> tuple[str, list[int]]:
-        assert key in self._unique_vals, f"Invalid key for MolData's unique chars: {key}"
+        self._assert_key(key)
         vals = self._unique_vals[key]
         idx = self._idx_unique_current[key]
 
         chars = '"' + '" "'.join(vals) + '"'
+        if self.current_unique != key:
+            return chars, pr.A_NORMAL
+
         mask = ' '.join( # maybe not the most readable way to do this, but it works nicely
             f"!{'!'*len(v)}!" if idx == i else f" {' '*len(v)} "
             for i,v in enumerate(vals)
         )
         attrs = [[pr.A_REVERSE if m == '!' else pr.A_NORMAL for m in mask]]
         return chars, attrs
+
+    # --------------------------------------------------------------------------
+    def _assert_key(self, key: str):
+        assert key in self._unique_vals, \
+            f"Invalid key for MolData's unique chars: '{key}'. " +\
+            f"Available keys: {self._unique_vals.keys()}"
 
 
 # //////////////////////////////////////////////////////////////////////////////
