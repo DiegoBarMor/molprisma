@@ -9,7 +9,7 @@ class MolKind(Enum):
 
 
 # //////////////////////////////////////////////////////////////////////////////
-class ColorBy(Enum):
+class ColorBy(Enum): # [WIP] probably won't use this anymore
     COLUMN = auto()
     ROWTYPE = auto()
 

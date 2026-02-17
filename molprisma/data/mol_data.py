@@ -5,12 +5,13 @@ import molprisma as mp
 # //////////////////////////////////////////////////////////////////////////////
 class MolData:
     def __init__(self, name = ""):
-        self.name = name
-        self.current_line = 0
-        self.current_section = 0
+        self.name: str = name
+        self.nsections = 0
+        self.current_line: int = 0 # a.k.a row
+        self.current_section: int | None = None # a.k.a column
+        self._idxs_chars2idxs_sects = [None for _ in range(ms.LENGTH_RECORD)]
         self._lines: list[mp.MolLine] = []
         self._sections: list[mp.PDBSection] = []
-        self.nsections = 0
 
     # --------------------------------------------------------------------------
     def __len__(self):
@@ -19,7 +20,8 @@ class MolData:
     # --------------------------------------------------------------------------
     def reset(self):
         self.current_line = 0
-        self.current_section = 0
+        self.current_section = None
+        self._idxs_chars2idxs_sects = [None for _ in range(ms.LENGTH_RECORD)]
         self._lines.clear()
         self._sections.clear()
         self._init_sections()
@@ -62,6 +64,11 @@ class MolData:
             yield section
 
     # --------------------------------------------------------------------------
+    def get_idx_section(self, idx_char: int):
+        """Returns the section index associated to a character's column index"""
+        return self._idxs_chars2idxs_sects[idx_char]
+
+    # --------------------------------------------------------------------------
     def _init_sections(self):
         constants = ms.get_pdb_constants()
         keys = set(k[:-4] for k in constants.keys() if k.endswith("_END"))
@@ -73,6 +80,9 @@ class MolData:
 
         self._sections.sort(key = lambda s: s.start)
         self.nsections = len(self._sections)
+
+        for i,section in enumerate(self._sections):
+            self._idxs_chars2idxs_sects[section.start:section.end] = [i] * (section.end - section.start)
 
 
 # //////////////////////////////////////////////////////////////////////////////

@@ -9,8 +9,8 @@ class TUIMolPrisma(pr.Terminal):
     PDB_WIDTH = 80
     H_GUIDES = 2
 
-    KEY_CTRL_HOME = 540 # [TODO] seems unstable, change key
-    KEY_CTRL_END = 535
+    KEY_SCROLL_TOP    = ord('-')
+    KEY_SCROLL_BOTTOM = ord('+')
 
     COLOR_GRAY = 8
     COLOR_YELLOW_SOFT = 9
@@ -24,19 +24,24 @@ class TUIMolPrisma(pr.Terminal):
         self._show_hete = True
         self._show_meta = True
         self._color_by = mp.ColorBy.ROWTYPE
-
-        self._mask_alt_columns: list[bool] = [False for _ in range(ms.LENGTH_RECORD)]
-        for i,section in enumerate(self._mol._sections):
-            if i % 2 == 1: continue
-            self._mask_alt_columns[section.start:section.end] = [True] * (section.end - section.start)
-
         self._filter_key: callable[mp.MolLine] = lambda _: True
+
+        ### this mask is used in TUIMolPrisma._get_attr_array for choosing appropriate column colors
+        ### this is not a boolean mask. instead, it has 3 possible values
+        ### 0: reserved for empty columns i.e. those not associated with PDB sections
+        ### 1: first  color variation for relevant columns
+        ### 2: second color variation for relevant columns
+        self._mask_cols_alt_color: list[bool] = [0 for _ in range(ms.LENGTH_RECORD)]
+        for i,section in enumerate(self._mol._sections):
+            val_mask = 2 if i % 2 == 1 else 1
+            self._mask_cols_alt_color[section.start:section.end] = [val_mask] * (section.end - section.start)
+
 
 
     # --------------------------------------------------------------------------
     def on_start(self):
-        pr.init_color(self.COLOR_GRAY, 200, 200, 200)
-        pr.init_color(self.COLOR_YELLOW_SOFT, 500, 500, 200)
+        pr.init_color(self.COLOR_GRAY, 400, 400, 400)
+        pr.init_color(self.COLOR_YELLOW_SOFT, 700, 700, 200)
         pr.init_color(self.COLOR_GREEN_SOFT, 200, 500, 200)
         self.pair_none = pr.init_pair(1, pr.COLOR_WHITE, pr.COLOR_RED)
         self.pair_meta = pr.init_pair(2, pr.COLOR_WHITE, self.COLOR_GRAY)
@@ -64,6 +69,8 @@ class TUIMolPrisma(pr.Terminal):
         match self.key:
             case pr.KEY_UP:      self._scroll_up(1)
             case pr.KEY_DOWN:    self._scroll_down(1)
+            case pr.KEY_LEFT:    self._prev_column()
+            case pr.KEY_RIGHT:   self._next_column()
             case pr.KEY_PPAGE:   self._scroll_up(self.NLINES_FAST_SCROLL)
             case pr.KEY_NPAGE:   self._scroll_down(self.NLINES_FAST_SCROLL)
             case pr.KEY_H_LOWER: self._help_screen()
@@ -80,8 +87,8 @@ class TUIMolPrisma(pr.Terminal):
             case pr.KEY_R_UPPER: self._color_by = mp.ColorBy.ROWTYPE
             case pr.KEY_C_LOWER: self._color_by = mp.ColorBy.COLUMN
             case pr.KEY_C_UPPER: self._color_by = mp.ColorBy.COLUMN
-            case self.KEY_CTRL_HOME: self._scroll_up(float("inf"))
-            case self.KEY_CTRL_END:  self._scroll_down(float("inf"))
+            case self.KEY_SCROLL_TOP:    self._scroll_up(float("inf"))
+            case self.KEY_SCROLL_BOTTOM: self._scroll_down(float("inf"))
 
         hdisplay = self.lsect_body.h - 2
         self.NLINES_FAST_SCROLL = hdisplay // 2 # dinamically adjust fast scroll based on terminal height
@@ -97,8 +104,12 @@ class TUIMolPrisma(pr.Terminal):
 
         self.rsect.draw_text(1, 2, "PDB Sections:", pr.A_BOLD)
         self.rsect.draw_text(2, 2, "0-index | 1-index  | Name       ", pr.A_UNDERLINE)
-        for i,section in enumerate(self._mol._sections, start = 3):
-            self.rsect.draw_text(i, 2, f"{section.display_idx_range(zero_indexing = True)} | {section.display_idx_range(zero_indexing = False)} | {section.name}")
+        for i,section in enumerate(self._mol._sections):
+            # [WIP] initialize strings only once?
+            self.rsect.draw_text(3+i, 2,
+                f"{section.display_idx_range(zero_indexing = True)} | {section.display_idx_range(zero_indexing = False)} | {section.name}",
+                attr = pr.A_REVERSE if i == self._mol.current_section else pr.A_NORMAL
+            )
 
 
     # --------------------------------------------------------------------------
@@ -153,6 +164,23 @@ class TUIMolPrisma(pr.Terminal):
 
 
     # --------------------------------------------------------------------------
+    def _prev_column(self):
+        idx = (self._mol.nsections - 1) \
+            if (self._mol.current_section is None) \
+            else (self._mol.current_section - 1)
+        if idx == -1: idx = None
+        self._mol.current_section = idx
+
+
+    # --------------------------------------------------------------------------
+    def _next_column(self):
+        idx = 0 if (self._mol.current_section is None) \
+            else (self._mol.current_section + 1)
+        if idx == self._mol.nsections: idx = None
+        self._mol.current_section = idx
+
+
+    # --------------------------------------------------------------------------
     def _help_screen(self):
         ... # [TODO]
 
@@ -187,26 +215,26 @@ class TUIMolPrisma(pr.Terminal):
         self._update_pos()
 
 
-    # # --------------------------------------------------------------------------
-    # def _next_column(self, reset: bool = False):
-    #     if reset:
-    #         self._color_by = mp.ColorBy.COLUMN
-
-
     # --------------------------------------------------------------------------
     def _get_attr_array(self, line: mp.MolLine) -> list[int]:
-        if self._color_by == mp.ColorBy.COLUMN:
-            pair = self.pair_none if line.kind == mp.MolKind.NONE else self.pair_help
-            return [pair for _ in line.text]
+        def get_attr_atoms(i):
+            idx_sect = self._mol.get_idx_section(i)
+            if idx_sect is None: return pr.A_NORMAL
+            return pr.A_REVERSE if idx_sect == self._mol.current_section else pr.A_NORMAL
 
-        match line.kind:
-            case mp.MolKind.NONE: pairs = (self.pair_none, self.pair_none)
-            case mp.MolKind.META: pairs = (self.pair_meta, self.pair_meta)
-            case mp.MolKind.ATOM: pairs = (self.pair_atom, self.pair_atom_alt)
-            case mp.MolKind.HETE: pairs = (self.pair_hete, self.pair_hete_alt)
+        get_attr_other = lambda _: pr.A_NORMAL
+
+        match line.kind: #               color_empty   | color_standard| color_alt         | highligh or normal attr
+            case mp.MolKind.NONE: tup = (self.pair_none, self.pair_none, self.pair_none,     get_attr_other)
+            case mp.MolKind.META: tup = (self.pair_meta, self.pair_meta, self.pair_meta,     get_attr_other)
+            case mp.MolKind.ATOM: tup = (self.pair_meta, self.pair_atom, self.pair_atom_alt, get_attr_atoms)
+            case mp.MolKind.HETE: tup = (self.pair_meta, self.pair_hete, self.pair_hete_alt, get_attr_atoms)
             case _: raise ValueError("Unknown MolKind")
 
-        return [pairs[1 if m else 0] for m in self._mask_alt_columns]
+        return [
+            tup[int(m)] | tup[3](i)
+            for i,m in enumerate(self._mask_cols_alt_color)
+        ]
 
 
     # --------------------------------------------------------------------------
