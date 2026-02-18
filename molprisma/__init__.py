@@ -1,3 +1,4 @@
+from .misc.pdb_constants import LENGTH_RECORD, PDB_CONSTANTS
 from .misc.enums import MolKind
 from .misc.utils import Utils
 

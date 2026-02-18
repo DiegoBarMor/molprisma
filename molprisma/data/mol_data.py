@@ -1,4 +1,3 @@
-import molsimple as ms
 import prismatui as pr
 
 import molprisma as mp
@@ -29,7 +28,7 @@ class MolData:
             k: None for k in self.KEYS_FILTERS.keys()
         } # stores the current index of every filter (None if disabled)
 
-        self._idxs_chars2idxs_sects = [None for _ in range(ms.LENGTH_RECORD)]
+        self._idxs_chars2idxs_sects = [None for _ in range(mp.LENGTH_RECORD)]
         self._lines: list[mp.MolLine] = []
         self._sections: list[mp.PDBSection] = []
 
@@ -41,18 +40,17 @@ class MolData:
     def reset(self):
         self.current_line = 0
         self.current_section = None
-        self._idxs_chars2idxs_sects = [None for _ in range(ms.LENGTH_RECORD)]
+        self._idxs_chars2idxs_sects = [None for _ in range(mp.LENGTH_RECORD)]
         for v in self._filter_refs.values(): v.clear()
         self._lines.clear()
         self._sections.clear()
 
     # --------------------------------------------------------------------------
     def init_sections(self):
-        constants = ms.get_pdb_constants()
-        keys = set(k[:-4] for k in constants.keys() if k.endswith("_END"))
+        keys = set(k[:-4] for k in mp.PDB_CONSTANTS.keys() if k.endswith("_END"))
         for key in keys:
-            start = constants.get(f"{key}_START", None)
-            end   = constants.get(f"{key}_END",   None)
+            start = mp.PDB_CONSTANTS.get(f"{key}_START", None)
+            end   = mp.PDB_CONSTANTS.get(f"{key}_END",   None)
             if start is None or end is None: continue
             self._sections.append(mp.PDBSection(key, start, end))
 

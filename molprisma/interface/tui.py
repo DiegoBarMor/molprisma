@@ -1,4 +1,3 @@
-import molsimple as ms
 import prismatui as pr
 
 import molprisma as mp
@@ -34,7 +33,7 @@ class TUIMolPrisma(pr.Terminal):
         ### 0: reserved for empty columns i.e. those not associated with PDB sections
         ### 1: first  color variation for relevant columns
         ### 2: second color variation for relevant columns
-        self._mask_cols_alt_color: list[bool] = [0 for _ in range(ms.LENGTH_RECORD)]
+        self._mask_cols_alt_color: list[bool] = [0 for _ in range(mp.LENGTH_RECORD)]
         for i,section in enumerate(self._mol._sections):
             val_mask = 2 if i % 2 == 1 else 1
             self._mask_cols_alt_color[section.start:section.end] = [val_mask] * (section.end - section.start)
@@ -154,7 +153,7 @@ class TUIMolPrisma(pr.Terminal):
                 ("arecil: filter", self._mol.any_filter_active()),
             ))
         )
-        self.lsect_footer.draw_text(0, "r-2", "k: reset", self.pair_help)
+        self.lsect_footer.draw_text(0, -2, "k: reset", self.pair_help)
 
         self.lsect_footer.draw_matrix(1, 2, # "bottom" guides
             *self._get_guides_matrices(guides = (
@@ -166,7 +165,7 @@ class TUIMolPrisma(pr.Terminal):
                 ("+: end", None),
             ))
         )
-        self.lsect_footer.draw_text(1, "r-2", "q: quit", self.pair_help)
+        self.lsect_footer.draw_text(1, -2, "q: quit", self.pair_help)
 
 
     # --------------------------------------------------------------------------
@@ -203,15 +202,11 @@ class TUIMolPrisma(pr.Terminal):
 
         self.rsect_bottom.draw_border()
         self.rsect_bottom.draw_text(0, 2, " Filters ", pr.A_BOLD)
-        self.rsect_bottom.draw_text("b-1", 2,
-            "Press [a]/[r]/[e]/[c]/[i]/[l] to show only rows matching...",
-            attr = self.pair_help_soft
-        )
-        self.rsect_bottom.draw_text("b", 2,
+        self.rsect_bottom.draw_text(-1, 2,
+            "Press [a]/[r]/[e]/[c]/[i]/[l] to show only rows matching...\n" +\
             "... a specific atom/residue/element/chain/insertion/altloc.",
             attr = self.pair_help_soft, blend = pr.BlendMode.OVERWRITE
         )
-
 
 
     # --------------------------------------------------------------------------
