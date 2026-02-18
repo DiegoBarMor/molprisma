@@ -5,7 +5,7 @@ import molprisma as mp
 
 # //////////////////////////////////////////////////////////////////////////////
 class MolData:
-    UNIQUE_VALS_KEYS = {
+    KEYS_FILTERS = {
         "altloc": "ALTLOC",
         "chains": "CHAIN_ID",
         "elements": "ELEMENT_SYMBOL",
@@ -19,10 +19,12 @@ class MolData:
         self.current_line: int = 0 # a.k.a row
         self.current_section: int | None = None # a.k.a column
 
-        self._unique_vals: dict[str, list[str]] = {
+        self._refs_filters: dict[str, list[str]] = {
+            # store all the possible reference strings for every filter
             "altloc" : [],   "chains" : [],   "elements" : [],   "resnames" : [],
         }
-        self._idxs_uniques: dict[str, int | None] = {
+        self._idxs_filters: dict[str, int | None] = {
+            # store the current index of every filter (None if disabled)
             "altloc" : None, "chains" : None, "elements" : None, "resnames" : None,
         }
 
@@ -39,7 +41,7 @@ class MolData:
         self.current_line = 0
         self.current_section = None
         self._idxs_chars2idxs_sects = [None for _ in range(ms.LENGTH_RECORD)]
-        for v in self._unique_vals.values(): v.clear()
+        for v in self._refs_filters.values(): v.clear()
         self._lines.clear()
         self._sections.clear()
 
@@ -60,9 +62,9 @@ class MolData:
             self._idxs_chars2idxs_sects[section.start:section.end] = [i] * (section.end - section.start)
 
     # --------------------------------------------------------------------------
-    def init_unique_values(self):
-        for k,name_section in self.UNIQUE_VALS_KEYS.items():
-            self._unique_vals[k] = list(sorted(set(
+    def init_filters(self):
+        for k,name_section in self.KEYS_FILTERS.items():
+            self._refs_filters[k] = list(sorted(set(
                 line.get_section_data(name_section) for line in self._lines
             ) - {None}))
 
@@ -117,27 +119,28 @@ class MolData:
         self.current_section = mp.Utils.next_cyclic(self.current_section, self.nsections)
 
     # --------------------------------------------------------------------------
-    def next_unique(self, key):
+    def next_filter(self, key):
         self._assert_key(key)
-        vals = self._unique_vals[key]
-        self._idxs_uniques[key] = mp.Utils.next_cyclic(
-            self._idxs_uniques[key], len(vals)
+        vals = self._refs_filters[key]
+        self._idxs_filters[key] = mp.Utils.next_cyclic(
+            self._idxs_filters[key], len(vals)
         )
 
     # --------------------------------------------------------------------------
-    def reset_idx_unique(self):
-        for k in self._idxs_uniques.keys():
-            self._idxs_uniques[k] = None
+    def reset_filter_idxs(self):
+        for k in self._idxs_filters.keys():
+            self._idxs_filters[k] = None
 
     # --------------------------------------------------------------------------
-    def any_unique(self):
-        return any(idx is not None for idx in self._idxs_uniques.values())
+    def any_filter_active(self):
+        return any(idx is not None for idx in self._idxs_filters.values())
 
     # --------------------------------------------------------------------------
-    def get_unique_chars_attrs(self, key: str) -> tuple[str, list[int]]:
+    def get_filter_render_data(self, key: str) -> tuple[str, list[int]]:
+        """Return 'chars' and 'attrs' data for rendering a filter's state with PrismaTUI"""
         self._assert_key(key)
-        vals = [v if v else "''" for v in self._unique_vals[key]]
-        idx = self._idxs_uniques[key]
+        vals = [v if v else "''" for v in self._refs_filters[key]]
+        idx = self._idxs_filters[key]
 
         chars = ' '.join(vals)
         mask = ' '.join(
@@ -148,19 +151,19 @@ class MolData:
         return chars, attrs
 
     # --------------------------------------------------------------------------
-    def match_uniques(self, line: mp.MolLine) -> bool:
-        for key in self._unique_vals.keys():
-            if not self._match_unique(line, key):
+    def match_filters(self, line: mp.MolLine) -> bool:
+        for key in self._refs_filters.keys():
+            if not self._match_filter(line, key):
                 return False
         return True
 
     # --------------------------------------------------------------------------
-    def _match_unique(self, line: mp.MolLine, key: str) -> bool:
-        vals = self._unique_vals[key]
-        idx = self._idxs_uniques[key]
+    def _match_filter(self, line: mp.MolLine, key: str) -> bool:
+        vals = self._refs_filters[key]
+        idx = self._idxs_filters[key]
         if idx is None: return True
 
-        key_pdb_section = self.UNIQUE_VALS_KEYS[key]
+        key_pdb_section = self.KEYS_FILTERS[key]
         to_evaluate = line.get_section_data(key_pdb_section)
         if to_evaluate is None: return False
 
@@ -168,9 +171,9 @@ class MolData:
 
     # --------------------------------------------------------------------------
     def _assert_key(self, key: str):
-        assert key in self._unique_vals, \
-            f"Invalid key for MolData's unique chars: '{key}'. " +\
-            f"Available keys: {self._unique_vals.keys()}"
+        assert key in self._refs_filters, \
+            f"Invalid key for MolData's filter: '{key}'. " +\
+            f"Available filters: {self._refs_filters.keys()}"
 
 
 # //////////////////////////////////////////////////////////////////////////////

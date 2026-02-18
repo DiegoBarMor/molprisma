@@ -23,8 +23,9 @@ class TUIMolPrisma(pr.Terminal):
         self._mol: mp.MolData = mol_data
         self._show_atom: bool = True
         self._show_hete: bool = True
-        self._show_meta: bool = True
-        self._filter_key: callable[mp.MolLine] = lambda _: True
+        self._show_meta: bool = False
+        self._filter_key: callable[mp.MolLine] =\
+            lambda line: line.kind != mp.MolKind.META
 
         ### this mask is used in TUIMolPrisma._get_attr_array for choosing appropriate column colors
         ### this is not a boolean mask. instead, it has 3 possible values
@@ -91,14 +92,14 @@ class TUIMolPrisma(pr.Terminal):
             case pr.KEY_RIGHT:   self._mol.next_column()
             case pr.KEY_PPAGE:   self._scroll_up(self.NLINES_FAST_SCROLL)
             case pr.KEY_NPAGE:   self._scroll_down(self.NLINES_FAST_SCROLL)
-            case pr.KEY_A_LOWER: self._next_unique("altloc")
-            case pr.KEY_A_UPPER: self._next_unique("altloc")
-            case pr.KEY_C_LOWER: self._next_unique("chains")
-            case pr.KEY_C_UPPER: self._next_unique("chains")
-            case pr.KEY_E_LOWER: self._next_unique("elements")
-            case pr.KEY_E_UPPER: self._next_unique("elements")
-            case pr.KEY_R_LOWER: self._next_unique("resnames")
-            case pr.KEY_R_UPPER: self._next_unique("resnames")
+            case pr.KEY_A_LOWER: self._next_filter("altloc")
+            case pr.KEY_A_UPPER: self._next_filter("altloc")
+            case pr.KEY_C_LOWER: self._next_filter("chains")
+            case pr.KEY_C_UPPER: self._next_filter("chains")
+            case pr.KEY_E_LOWER: self._next_filter("elements")
+            case pr.KEY_E_UPPER: self._next_filter("elements")
+            case pr.KEY_R_LOWER: self._next_filter("resnames")
+            case pr.KEY_R_UPPER: self._next_filter("resnames")
             case pr.KEY_K_LOWER: self._reset_filters()
             case pr.KEY_K_UPPER: self._reset_filters()
             case self.KEY_SCROLL_TOP:    self._scroll_up(float("inf"))
@@ -123,8 +124,8 @@ class TUIMolPrisma(pr.Terminal):
                 attr = pr.A_REVERSE if i == self._mol.current_section else pr.A_NORMAL
             )
 
-        for i,k in enumerate(self._mol.UNIQUE_VALS_KEYS.keys(), start = 1):
-            chars, attrs = self._mol.get_unique_chars_attrs(k)
+        for i,k in enumerate(self._mol.KEYS_FILTERS.keys(), start = 1):
+            chars, attrs = self._mol.get_filter_render_data(k)
             self.rsect_bottom.draw_text(i, 2, f"{k}:")
             self.rsect_bottom.draw_text(i, 12, chars, attrs)
         self.rsect_bottom.draw_text(i+1, 2, "... Press [a]/[c]/[e]/[r] to show only rows")
@@ -138,15 +139,15 @@ class TUIMolPrisma(pr.Terminal):
 
     # --------------------------------------------------------------------------
     def _draw_guides_top(self):
-        show_all = self._show_atom and self._show_hete and self._show_meta
+        showing_all = self._show_atom and self._show_hete and self._show_meta
         self.lsect_footer.draw_matrix(0, 2,
             *self._get_guides_matrices(guides = (
                 ("toggle...",       None),
-                ("1: all",          show_all),
+                ("1: all",          showing_all),
                 ("2: atoms",        self._show_atom),
                 ("3: hetatms",      self._show_hete),
                 ("4: metadata",     self._show_meta),
-                ("a/c/e/r: filter", self._mol.any_unique()),
+                ("a/c/e/r: filter", self._mol.any_filter_active()),
             ))
         )
         self.lsect_footer.draw_text(0, "r-2", "k: reset", self.pair_help)
@@ -178,7 +179,7 @@ class TUIMolPrisma(pr.Terminal):
         self.rsect_top.draw_text(0, 2, " PDB Sections ", pr.A_BOLD)
 
         self.rsect_bottom.draw_border()
-        self.rsect_bottom.draw_text(0, 2, " Unique Values ", pr.A_BOLD)
+        self.rsect_bottom.draw_text(0, 2, " Filters ", pr.A_BOLD)
 
 
     # --------------------------------------------------------------------------
@@ -194,9 +195,10 @@ class TUIMolPrisma(pr.Terminal):
 
     # --------------------------------------------------------------------------
     def _toggle_all(self):
-        self._show_meta = not self._show_meta
-        self._show_atom = not self._show_atom
-        self._show_hete = not self._show_hete
+        was_showing_all = self._show_atom and self._show_hete and self._show_meta
+        self._show_meta = not was_showing_all
+        self._show_atom = not was_showing_all
+        self._show_hete = not was_showing_all
         self._update_filter_key()
         self._update_pos()
 
@@ -223,8 +225,8 @@ class TUIMolPrisma(pr.Terminal):
 
 
     # --------------------------------------------------------------------------
-    def _next_unique(self, name: str):
-        self._mol.next_unique(name)
+    def _next_filter(self, name: str):
+        self._mol.next_filter(name)
         self._update_filter_key()
         self._update_pos()
 
@@ -234,7 +236,7 @@ class TUIMolPrisma(pr.Terminal):
         self._show_meta = True
         self._show_atom = True
         self._show_hete = True
-        self._mol.reset_idx_unique()
+        self._mol.reset_filter_idxs()
         self._update_filter_key()
         self._update_pos()
 
@@ -265,7 +267,7 @@ class TUIMolPrisma(pr.Terminal):
     def _update_filter_key(self):
         def filterkey(line: mp.MolLine) -> bool:
             if line.kind == mp.MolKind.NONE: return True
-            if not self._mol.match_uniques(line): return False
+            if not self._mol.match_filters(line): return False
             match line.kind:
                 case mp.MolKind.META: return self._show_meta
                 case mp.MolKind.ATOM: return self._show_atom

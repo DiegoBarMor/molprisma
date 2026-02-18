@@ -19,7 +19,7 @@ class ParserPDB:
         self._mol.reset()
         self._parse_lines()
         self._mol.init_sections()
-        self._mol.init_unique_values()
+        self._mol.init_filters()
         return self._mol
 
 
