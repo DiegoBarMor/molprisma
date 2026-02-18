@@ -97,8 +97,8 @@ class TUIMolPrisma(pr.Terminal):
             case pr.KEY_E_UPPER: self._next_unique("elements")
             case pr.KEY_R_LOWER: self._next_unique("resnames")
             case pr.KEY_R_UPPER: self._next_unique("resnames")
-            case pr.KEY_X_LOWER: self._cancel_unique()
-            case pr.KEY_X_UPPER: self._cancel_unique()
+            case pr.KEY_X_LOWER: self._reset_filters()
+            case pr.KEY_X_UPPER: self._reset_filters()
             case self.KEY_SCROLL_TOP:    self._scroll_up(float("inf"))
             case self.KEY_SCROLL_BOTTOM: self._scroll_down(float("inf"))
 
@@ -110,6 +110,7 @@ class TUIMolPrisma(pr.Terminal):
         attrs = [self._get_attr_array(line) for line in lines]
 
         self.lsect.draw_matrix(1, 1, chars, attrs)
+
         self._draw_borders()
         self._draw_guides_top()
         self._draw_guides_bottom()
@@ -126,7 +127,6 @@ class TUIMolPrisma(pr.Terminal):
             self.rsect_bottom.draw_text(i, 12, chars, attrs)
         self.rsect_bottom.draw_text(i+1, 2, "... Press [c]/[e]/[r] to show only rows")
         self.rsect_bottom.draw_text(i+2, 2, "... matching a specific chain/element/residue.")
-        self.rsect_bottom.draw_text(i+3, 2, "... Press [x] to cancel the filtering")
 
 
     # --------------------------------------------------------------------------
@@ -144,10 +144,10 @@ class TUIMolPrisma(pr.Terminal):
                 ("s: atoms",      self._show_atom),
                 ("d: hetatms",    self._show_hete),
                 ("f: metadata",   self._show_meta),
-                ("c/e/r: unique", self._mol.current_unique is not None),
+                ("c/e/r: filter", self._mol.current_unique is not None),
             ))
         )
-        self.lsect_footer.draw_text(0, "r-2", "[h]elp", self.pair_help)
+        self.lsect_footer.draw_text(0, "r-2", "x: reset", self.pair_help)
 
 
     # --------------------------------------------------------------------------
@@ -162,7 +162,7 @@ class TUIMolPrisma(pr.Terminal):
                 ("+: end", None),
             ))
         )
-        self.lsect_footer.draw_text(0, "r-2", "[q]uit", self.pair_help)
+        self.lsect_footer.draw_text(1, "r-2", "[q]uit", self.pair_help)
 
 
     # --------------------------------------------------------------------------
@@ -244,11 +244,17 @@ class TUIMolPrisma(pr.Terminal):
         self._mol.current_unique = name
         if name != prev_name: return
         self._mol.increment_idx_unique_current()
+        self._update_pos()
 
 
     # --------------------------------------------------------------------------
-    def _cancel_unique(self):
+    def _reset_filters(self):
+        self._show_meta = True
+        self._show_atom = True
+        self._show_hete = True
         self._mol.current_unique = None
+        self._update_filter_key()
+        self._update_pos()
 
 
     # --------------------------------------------------------------------------
@@ -278,7 +284,7 @@ class TUIMolPrisma(pr.Terminal):
         def filterkey(line: mp.MolLine) -> bool:
             if self._mol.current_unique is not None:
                 if not self._mol.match_current_unique_char(line):
-                    return False
+                    return line.kind == mp.MolKind.NONE # "none" lines should never be skipped
 
             match line.kind:
                 case mp.MolKind.NONE: return True

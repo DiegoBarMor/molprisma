@@ -137,15 +137,15 @@ class MolData:
     # --------------------------------------------------------------------------
     def get_unique_chars_attrs(self, key: str) -> tuple[str, list[int]]:
         self._assert_key(key)
-        vals = self._unique_vals[key]
+        vals = [v if v else "''" for v in self._unique_vals[key]]
         idx = self._idx_unique_current[key]
 
-        chars = '"' + '" "'.join(vals) + '"'
+        chars = ' '.join(vals)
         if self.current_unique != key:
             return chars, pr.A_NORMAL
 
-        mask = ' '.join( # maybe not the most readable way to do this, but it works nicely
-            f"!{'!'*len(v)}!" if idx == i else f" {' '*len(v)} "
+        mask = ' '.join(
+            len(v)*('!' if idx == i else ' ')
             for i,v in enumerate(vals)
         )
         attrs = [[pr.A_REVERSE if m == '!' else pr.A_NORMAL for m in mask]]
