@@ -6,10 +6,12 @@ import molprisma as mp
 # //////////////////////////////////////////////////////////////////////////////
 class MolData:
     KEYS_FILTERS = {
-        "altloc": "ALTLOC",
-        "chains": "CHAIN_ID",
-        "elements": "ELEMENT_SYMBOL",
-        "resnames": "RESIDUE_NAME",
+        "[a]tomname" : "ATOM_NAME",
+        "[r]esname"  : "RESIDUE_NAME",
+        "[e]lement"  : "ELEMENT_SYMBOL",
+        "[c]hain"    : "CHAIN_ID",
+        "[i]nsertion": "RESIDUE_INSERTION_CODE",
+        "alt[l]oc"   : "ALTLOC",
     }
 
     # --------------------------------------------------------------------------
@@ -19,14 +21,13 @@ class MolData:
         self.current_line: int = 0 # a.k.a row
         self.current_section: int | None = None # a.k.a column
 
-        self._refs_filters: dict[str, list[str]] = {
-            # store all the possible reference strings for every filter
-            "altloc" : [],   "chains" : [],   "elements" : [],   "resnames" : [],
-        }
-        self._idxs_filters: dict[str, int | None] = {
-            # store the current index of every filter (None if disabled)
-            "altloc" : None, "chains" : None, "elements" : None, "resnames" : None,
-        }
+        self._filter_refs: dict[str, list[str]] = {
+            k: [] for k in self.KEYS_FILTERS.keys()
+        } # stores all the possible reference strings for every filter
+
+        self._filter_idxs: dict[str, int | None] = {
+            k: None for k in self.KEYS_FILTERS.keys()
+        } # stores the current index of every filter (None if disabled)
 
         self._idxs_chars2idxs_sects = [None for _ in range(ms.LENGTH_RECORD)]
         self._lines: list[mp.MolLine] = []
@@ -41,7 +42,7 @@ class MolData:
         self.current_line = 0
         self.current_section = None
         self._idxs_chars2idxs_sects = [None for _ in range(ms.LENGTH_RECORD)]
-        for v in self._refs_filters.values(): v.clear()
+        for v in self._filter_refs.values(): v.clear()
         self._lines.clear()
         self._sections.clear()
 
@@ -64,7 +65,7 @@ class MolData:
     # --------------------------------------------------------------------------
     def init_filters(self):
         for k,name_section in self.KEYS_FILTERS.items():
-            self._refs_filters[k] = list(sorted(set(
+            self._filter_refs[k] = list(sorted(set(
                 line.get_section_data(name_section) for line in self._lines
             ) - {None}))
 
@@ -121,46 +122,52 @@ class MolData:
     # --------------------------------------------------------------------------
     def next_filter(self, key):
         self._assert_key(key)
-        vals = self._refs_filters[key]
-        self._idxs_filters[key] = mp.Utils.next_cyclic(
-            self._idxs_filters[key], len(vals)
+        vals = self._filter_refs[key]
+        self._filter_idxs[key] = mp.Utils.next_cyclic(
+            self._filter_idxs[key], len(vals)
         )
 
     # --------------------------------------------------------------------------
     def reset_filter_idxs(self):
-        for k in self._idxs_filters.keys():
-            self._idxs_filters[k] = None
+        for k in self._filter_idxs.keys():
+            self._filter_idxs[k] = None
 
     # --------------------------------------------------------------------------
     def any_filter_active(self):
-        return any(idx is not None for idx in self._idxs_filters.values())
+        return any(idx is not None for idx in self._filter_idxs.values())
 
     # --------------------------------------------------------------------------
-    def get_filter_render_data(self, key: str) -> tuple[str, list[int]]:
+    def get_filter_render_data(self, key: str, w_max = int) -> tuple[str, list[int]]:
         """Return 'chars' and 'attrs' data for rendering a filter's state with PrismaTUI"""
         self._assert_key(key)
-        vals = [v if v else "''" for v in self._refs_filters[key]]
-        idx = self._idxs_filters[key]
+        vals = [v if v else "''" for v in self._filter_refs[key]]
+        idx = self._filter_idxs[key]
 
         chars = ' '.join(vals)
         mask = ' '.join(
             len(v)*('!' if idx == i else ' ')
             for i,v in enumerate(vals)
         )
+
+        xpos_highlight = mask.find('!')
+        xoffset = 0 if xpos_highlight < w_max else xpos_highlight - w_max // 2
+        chars = chars[xoffset:]
+        mask  = mask [xoffset:]
+
         attrs = [[pr.A_REVERSE if m == '!' else pr.A_NORMAL for m in mask]]
         return chars, attrs
 
     # --------------------------------------------------------------------------
     def match_filters(self, line: mp.MolLine) -> bool:
-        for key in self._refs_filters.keys():
+        for key in self._filter_refs.keys():
             if not self._match_filter(line, key):
                 return False
         return True
 
     # --------------------------------------------------------------------------
     def _match_filter(self, line: mp.MolLine, key: str) -> bool:
-        vals = self._refs_filters[key]
-        idx = self._idxs_filters[key]
+        vals = self._filter_refs[key]
+        idx  = self._filter_idxs[key]
         if idx is None: return True
 
         key_pdb_section = self.KEYS_FILTERS[key]
@@ -171,9 +178,9 @@ class MolData:
 
     # --------------------------------------------------------------------------
     def _assert_key(self, key: str):
-        assert key in self._refs_filters, \
+        assert key in self._filter_refs, \
             f"Invalid key for MolData's filter: '{key}'. " +\
-            f"Available filters: {self._refs_filters.keys()}"
+            f"Available filters: {self._filter_refs.keys()}"
 
 
 # //////////////////////////////////////////////////////////////////////////////

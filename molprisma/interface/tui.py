@@ -9,6 +9,7 @@ class TUIMolPrisma(pr.Terminal):
     PDB_WIDTH = 80
     H_GUIDES = 2
     H_PDB_SECTIONS = 18
+    XPOS_FILTERS = 15
 
     KEY_SCROLL_TOP    = ord('-')
     KEY_SCROLL_BOTTOM = ord('+')
@@ -16,6 +17,7 @@ class TUIMolPrisma(pr.Terminal):
     COLOR_GRAY = 8
     COLOR_YELLOW_SOFT = 9
     COLOR_GREEN_SOFT = 10
+    COLOR_CYAN_SOFT = 11
 
     # --------------------------------------------------------------------------
     def __init__(self, mol_data: mp.MolData):
@@ -23,7 +25,7 @@ class TUIMolPrisma(pr.Terminal):
         self._mol: mp.MolData = mol_data
         self._show_atom: bool = True
         self._show_hete: bool = True
-        self._show_meta: bool = False
+        self._show_meta: bool = False # start with metadata hidden by default
         self._filter_key: callable[mp.MolLine] =\
             lambda line: line.kind != mp.MolKind.META
 
@@ -52,6 +54,7 @@ class TUIMolPrisma(pr.Terminal):
         pr.init_color(self.COLOR_GRAY, 400, 400, 400)
         pr.init_color(self.COLOR_YELLOW_SOFT, 700, 700, 300)
         pr.init_color(self.COLOR_GREEN_SOFT, 200, 500, 200)
+        pr.init_color(self.COLOR_CYAN_SOFT, 0, 300, 300)
         self.pair_none = pr.init_pair(1, pr.COLOR_WHITE, pr.COLOR_RED)
         self.pair_meta = pr.init_pair(2, pr.COLOR_WHITE, self.COLOR_GRAY)
         self.pair_atom = pr.init_pair(3, pr.COLOR_BLACK, pr.COLOR_YELLOW)
@@ -60,9 +63,10 @@ class TUIMolPrisma(pr.Terminal):
         self.pair_atom_alt = pr.init_pair(5, pr.COLOR_BLACK, self.COLOR_YELLOW_SOFT)
         self.pair_hete_alt = pr.init_pair(6, pr.COLOR_BLACK, self.COLOR_GREEN_SOFT)
 
-        self.pair_help   = pr.init_pair(7, pr.COLOR_BLACK, pr.COLOR_CYAN)
-        self.pair_help_0 = pr.init_pair(8, pr.COLOR_WHITE, pr.COLOR_RED)
-        self.pair_help_1 = pr.init_pair(9, pr.COLOR_BLACK, pr.COLOR_GREEN)
+        self.pair_help      = pr.init_pair(7,  pr.COLOR_BLACK, pr.COLOR_CYAN)
+        self.pair_help_0    = pr.init_pair(8,  pr.COLOR_WHITE, pr.COLOR_RED)
+        self.pair_help_1    = pr.init_pair(9,  pr.COLOR_BLACK, pr.COLOR_GREEN)
+        self.pair_help_soft = pr.init_pair(10, pr.COLOR_WHITE, self.COLOR_CYAN_SOFT)
 
         w_lsect = self.PDB_WIDTH + 2
 
@@ -77,6 +81,21 @@ class TUIMolPrisma(pr.Terminal):
 
     # --------------------------------------------------------------------------
     def on_update(self):
+        self._handle_key_press()
+        self._draw_borders()
+        self._draw_lsect_body()
+        self._draw_rsect_top()
+        self._draw_rsect_bottom()
+        self._draw_lsect_footer()
+
+
+    # --------------------------------------------------------------------------
+    def should_stop(self):
+        return self.key == pr.KEY_Q_LOWER or self.key == pr.KEY_Q_UPPER
+
+
+    # --------------------------------------------------------------------------
+    def _handle_key_press(self):
         match self.key:
             case pr.KEY_1:       self._toggle_all()
             case pr.KEY_1:       self._toggle_all()
@@ -92,19 +111,26 @@ class TUIMolPrisma(pr.Terminal):
             case pr.KEY_RIGHT:   self._mol.next_column()
             case pr.KEY_PPAGE:   self._scroll_up(self.NLINES_FAST_SCROLL)
             case pr.KEY_NPAGE:   self._scroll_down(self.NLINES_FAST_SCROLL)
-            case pr.KEY_A_LOWER: self._next_filter("altloc")
-            case pr.KEY_A_UPPER: self._next_filter("altloc")
-            case pr.KEY_C_LOWER: self._next_filter("chains")
-            case pr.KEY_C_UPPER: self._next_filter("chains")
-            case pr.KEY_E_LOWER: self._next_filter("elements")
-            case pr.KEY_E_UPPER: self._next_filter("elements")
-            case pr.KEY_R_LOWER: self._next_filter("resnames")
-            case pr.KEY_R_UPPER: self._next_filter("resnames")
+            case pr.KEY_A_LOWER: self._next_filter("[a]tomname")
+            case pr.KEY_A_UPPER: self._next_filter("[a]tomname")
+            case pr.KEY_R_LOWER: self._next_filter("[r]esname")
+            case pr.KEY_R_UPPER: self._next_filter("[r]esname")
+            case pr.KEY_E_LOWER: self._next_filter("[e]lement")
+            case pr.KEY_E_UPPER: self._next_filter("[e]lement")
+            case pr.KEY_C_LOWER: self._next_filter("[c]hain")
+            case pr.KEY_C_UPPER: self._next_filter("[c]hain")
+            case pr.KEY_I_LOWER: self._next_filter("[i]nsertion")
+            case pr.KEY_I_UPPER: self._next_filter("[i]nsertion")
+            case pr.KEY_L_LOWER: self._next_filter("alt[l]oc")
+            case pr.KEY_L_UPPER: self._next_filter("alt[l]oc")
             case pr.KEY_K_LOWER: self._reset_filters()
             case pr.KEY_K_UPPER: self._reset_filters()
             case self.KEY_SCROLL_TOP:    self._scroll_up(float("inf"))
             case self.KEY_SCROLL_BOTTOM: self._scroll_down(float("inf"))
 
+
+    # --------------------------------------------------------------------------
+    def _draw_lsect_body(self):
         hdisplay = self.lsect_body.h - 2
         self.NLINES_FAST_SCROLL = hdisplay // 2 # dinamically adjust fast scroll based on terminal height
 
@@ -112,50 +138,25 @@ class TUIMolPrisma(pr.Terminal):
         chars = [line.text for line in lines]
         attrs = [self._get_attr_array(line) for line in lines]
 
-        self.lsect.draw_matrix(1, 1, chars, attrs)
-
-        self._draw_borders()
-        self._draw_guides_top()
-        self._draw_guides_bottom()
-
-        self.rsect_top.draw_text(1, 2, self._str_sections_header, pr.A_UNDERLINE)
-        for i,chars in enumerate(self._strs_sections_body):
-            self.rsect_top.draw_text(2+i, 2, chars,
-                attr = pr.A_REVERSE if i == self._mol.current_section else pr.A_NORMAL
-            )
-
-        for i,k in enumerate(self._mol.KEYS_FILTERS.keys(), start = 1):
-            chars, attrs = self._mol.get_filter_render_data(k)
-            self.rsect_bottom.draw_text(i, 2, f"{k}:")
-            self.rsect_bottom.draw_text(i, 12, chars, attrs)
-        self.rsect_bottom.draw_text(i+1, 2, "... Press [a]/[c]/[e]/[r] to show only rows")
-        self.rsect_bottom.draw_text(i+2, 2, "... matching a specific altloc/chain/element/residue.")
+        self.lsect_body.draw_matrix(1, 1, chars, attrs)
 
 
     # --------------------------------------------------------------------------
-    def should_stop(self):
-        return self.key == pr.KEY_Q_LOWER or self.key == pr.KEY_Q_UPPER
-
-
-    # --------------------------------------------------------------------------
-    def _draw_guides_top(self):
+    def _draw_lsect_footer(self):
         showing_all = self._show_atom and self._show_hete and self._show_meta
-        self.lsect_footer.draw_matrix(0, 2,
+        self.lsect_footer.draw_matrix(0, 2, # "top" guides
             *self._get_guides_matrices(guides = (
-                ("toggle...",       None),
-                ("1: all",          showing_all),
-                ("2: atoms",        self._show_atom),
-                ("3: hetatms",      self._show_hete),
-                ("4: metadata",     self._show_meta),
-                ("a/c/e/r: filter", self._mol.any_filter_active()),
+                ("toggle...",     None),
+                ("1: all",        showing_all),
+                ("2: atoms",      self._show_atom),
+                ("3: hetatms",    self._show_hete),
+                ("4: metadata",   self._show_meta),
+                ("arecil: filter", self._mol.any_filter_active()),
             ))
         )
         self.lsect_footer.draw_text(0, "r-2", "k: reset", self.pair_help)
 
-
-    # --------------------------------------------------------------------------
-    def _draw_guides_bottom(self):
-        self.lsect_footer.draw_matrix(1, 2,
+        self.lsect_footer.draw_matrix(1, 2, # "bottom" guides
             *self._get_guides_matrices(guides = (
                 ("move...", None),
                 ("↑/↓: rows", None),
@@ -166,6 +167,28 @@ class TUIMolPrisma(pr.Terminal):
             ))
         )
         self.lsect_footer.draw_text(1, "r-2", "q: quit", self.pair_help)
+
+
+    # --------------------------------------------------------------------------
+    def _draw_rsect_top(self):
+        self.rsect_top.draw_text(1, 2, self._str_sections_header, pr.A_UNDERLINE)
+        for i,chars in enumerate(self._strs_sections_body):
+            self.rsect_top.draw_text(2+i, 2, chars,
+                attr = pr.A_REVERSE if i == self._mol.current_section else pr.A_NORMAL
+            )
+
+
+    # --------------------------------------------------------------------------
+    def _draw_rsect_bottom(self):
+        w_max = max(0, self.rsect_bottom.w - self.XPOS_FILTERS - 4) # 1 (border) + 3 (ellipses)
+        for i,k in enumerate(self._mol.KEYS_FILTERS.keys(), start = 1):
+            chars, attrs = self._mol.get_filter_render_data(k, w_max)
+            if len(chars) > w_max:
+                chars = chars[:w_max] + "..."
+                attrs = attrs[:w_max]
+
+            self.rsect_bottom.draw_text(i, 2, f"{k}:")
+            self.rsect_bottom.draw_text(i, self.XPOS_FILTERS, chars, attrs)
 
 
     # --------------------------------------------------------------------------
@@ -180,6 +203,15 @@ class TUIMolPrisma(pr.Terminal):
 
         self.rsect_bottom.draw_border()
         self.rsect_bottom.draw_text(0, 2, " Filters ", pr.A_BOLD)
+        self.rsect_bottom.draw_text("b-1", 2,
+            "Press [a]/[r]/[e]/[c]/[i]/[l] to show only rows matching...",
+            attr = self.pair_help_soft
+        )
+        self.rsect_bottom.draw_text("b", 2,
+            "... a specific atom/residue/element/chain/insertion/altloc.",
+            attr = self.pair_help_soft, blend = pr.BlendMode.OVERWRITE
+        )
+
 
 
     # --------------------------------------------------------------------------
