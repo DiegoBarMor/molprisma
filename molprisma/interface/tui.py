@@ -77,28 +77,30 @@ class TUIMolPrisma(pr.Terminal):
     # --------------------------------------------------------------------------
     def on_update(self):
         match self.key:
+            case pr.KEY_1:       self._toggle_all()
+            case pr.KEY_1:       self._toggle_all()
+            case pr.KEY_2:       self._toggle_atom()
+            case pr.KEY_2:       self._toggle_atom()
+            case pr.KEY_3:       self._toggle_hete()
+            case pr.KEY_3:       self._toggle_hete()
+            case pr.KEY_4:       self._toggle_meta()
+            case pr.KEY_4:       self._toggle_meta()
             case pr.KEY_UP:      self._scroll_up(1)
             case pr.KEY_DOWN:    self._scroll_down(1)
-            case pr.KEY_LEFT:    self._prev_column()
-            case pr.KEY_RIGHT:   self._next_column()
+            case pr.KEY_LEFT:    self._mol.prev_column()
+            case pr.KEY_RIGHT:   self._mol.next_column()
             case pr.KEY_PPAGE:   self._scroll_up(self.NLINES_FAST_SCROLL)
             case pr.KEY_NPAGE:   self._scroll_down(self.NLINES_FAST_SCROLL)
-            case pr.KEY_A_LOWER: self._toggle_all()
-            case pr.KEY_A_UPPER: self._toggle_all()
-            case pr.KEY_S_LOWER: self._toggle_atom()
-            case pr.KEY_S_UPPER: self._toggle_atom()
-            case pr.KEY_D_LOWER: self._toggle_hete()
-            case pr.KEY_D_UPPER: self._toggle_hete()
-            case pr.KEY_F_LOWER: self._toggle_meta()
-            case pr.KEY_F_UPPER: self._toggle_meta()
+            case pr.KEY_A_LOWER: self._next_unique("altloc")
+            case pr.KEY_A_UPPER: self._next_unique("altloc")
             case pr.KEY_C_LOWER: self._next_unique("chains")
             case pr.KEY_C_UPPER: self._next_unique("chains")
             case pr.KEY_E_LOWER: self._next_unique("elements")
             case pr.KEY_E_UPPER: self._next_unique("elements")
             case pr.KEY_R_LOWER: self._next_unique("resnames")
             case pr.KEY_R_UPPER: self._next_unique("resnames")
-            case pr.KEY_X_LOWER: self._reset_filters()
-            case pr.KEY_X_UPPER: self._reset_filters()
+            case pr.KEY_K_LOWER: self._reset_filters()
+            case pr.KEY_K_UPPER: self._reset_filters()
             case self.KEY_SCROLL_TOP:    self._scroll_up(float("inf"))
             case self.KEY_SCROLL_BOTTOM: self._scroll_down(float("inf"))
 
@@ -125,8 +127,8 @@ class TUIMolPrisma(pr.Terminal):
             chars, attrs = self._mol.get_unique_chars_attrs(k)
             self.rsect_bottom.draw_text(i, 2, f"{k}:")
             self.rsect_bottom.draw_text(i, 12, chars, attrs)
-        self.rsect_bottom.draw_text(i+1, 2, "... Press [c]/[e]/[r] to show only rows")
-        self.rsect_bottom.draw_text(i+2, 2, "... matching a specific chain/element/residue.")
+        self.rsect_bottom.draw_text(i+1, 2, "... Press [a]/[c]/[e]/[r] to show only rows")
+        self.rsect_bottom.draw_text(i+2, 2, "... matching a specific altloc/chain/element/residue.")
 
 
     # --------------------------------------------------------------------------
@@ -139,15 +141,15 @@ class TUIMolPrisma(pr.Terminal):
         show_all = self._show_atom and self._show_hete and self._show_meta
         self.lsect_footer.draw_matrix(0, 2,
             *self._get_guides_matrices(guides = (
-                ("toggle...",     None),
-                ("a: all",        show_all),
-                ("s: atoms",      self._show_atom),
-                ("d: hetatms",    self._show_hete),
-                ("f: metadata",   self._show_meta),
-                ("c/e/r: filter", self._mol.current_unique is not None),
+                ("toggle...",       None),
+                ("1: all",          show_all),
+                ("2: atoms",        self._show_atom),
+                ("3: hetatms",      self._show_hete),
+                ("4: metadata",     self._show_meta),
+                ("a/c/e/r: filter", self._mol.any_unique()),
             ))
         )
-        self.lsect_footer.draw_text(0, "r-2", "x: reset", self.pair_help)
+        self.lsect_footer.draw_text(0, "r-2", "k: reset", self.pair_help)
 
 
     # --------------------------------------------------------------------------
@@ -157,12 +159,12 @@ class TUIMolPrisma(pr.Terminal):
                 ("move...", None),
                 ("↑/↓: rows", None),
                 ("←/→: cols", None),
-                ("PPage/NPage: fast scroll",  None),
+                ("[P/N]Page: fast scroll",  None),
                 ("-: top", None),
                 ("+: end", None),
             ))
         )
-        self.lsect_footer.draw_text(1, "r-2", "[q]uit", self.pair_help)
+        self.lsect_footer.draw_text(1, "r-2", "q: quit", self.pair_help)
 
 
     # --------------------------------------------------------------------------
@@ -188,23 +190,6 @@ class TUIMolPrisma(pr.Terminal):
     def _scroll_down(self, nlines: int):
         nlines_available = self._mol.count_lines(self._filter_key) - 1 # account for NONE terminator line
         self._mol.current_line = min(self._mol.current_line + nlines, nlines_available - 1)
-
-
-    # --------------------------------------------------------------------------
-    def _prev_column(self):
-        idx = (self._mol.nsections - 1) \
-            if (self._mol.current_section is None) \
-            else (self._mol.current_section - 1)
-        if idx == -1: idx = None
-        self._mol.current_section = idx
-
-
-    # --------------------------------------------------------------------------
-    def _next_column(self):
-        idx = 0 if (self._mol.current_section is None) \
-            else (self._mol.current_section + 1)
-        if idx == self._mol.nsections: idx = None
-        self._mol.current_section = idx
 
 
     # --------------------------------------------------------------------------
@@ -239,11 +224,8 @@ class TUIMolPrisma(pr.Terminal):
 
     # --------------------------------------------------------------------------
     def _next_unique(self, name: str):
+        self._mol.next_unique(name)
         self._update_filter_key()
-        prev_name = self._mol.current_unique
-        self._mol.current_unique = name
-        if name != prev_name: return
-        self._mol.increment_idx_unique_current()
         self._update_pos()
 
 
@@ -252,7 +234,7 @@ class TUIMolPrisma(pr.Terminal):
         self._show_meta = True
         self._show_atom = True
         self._show_hete = True
-        self._mol.current_unique = None
+        self._mol.reset_idx_unique()
         self._update_filter_key()
         self._update_pos()
 
@@ -282,12 +264,9 @@ class TUIMolPrisma(pr.Terminal):
     # --------------------------------------------------------------------------
     def _update_filter_key(self):
         def filterkey(line: mp.MolLine) -> bool:
-            if self._mol.current_unique is not None:
-                if not self._mol.match_current_unique_char(line):
-                    return line.kind == mp.MolKind.NONE # "none" lines should never be skipped
-
+            if line.kind == mp.MolKind.NONE: return True
+            if not self._mol.match_uniques(line): return False
             match line.kind:
-                case mp.MolKind.NONE: return True
                 case mp.MolKind.META: return self._show_meta
                 case mp.MolKind.ATOM: return self._show_atom
                 case mp.MolKind.HETE: return self._show_hete

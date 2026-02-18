@@ -1,4 +1,5 @@
 from .misc.enums import MolKind
+from .misc.utils import Utils
 
 from .data.pdb_section import PDBSection
 from .data.mol_line import MolLine

@@ -6,6 +6,7 @@ import molprisma as mp
 # //////////////////////////////////////////////////////////////////////////////
 class MolData:
     UNIQUE_VALS_KEYS = {
+        "altloc": "ALTLOC",
         "chains": "CHAIN_ID",
         "elements": "ELEMENT_SYMBOL",
         "resnames": "RESIDUE_NAME",
@@ -17,13 +18,12 @@ class MolData:
         self.nsections = 0
         self.current_line: int = 0 # a.k.a row
         self.current_section: int | None = None # a.k.a column
-        self.current_unique: str | None = None # can be set to a unique value name to show only that one (i.e. "chains")
 
         self._unique_vals: dict[str, list[str]] = {
-            "chains" : [], "elements" : [], "resnames" : [],
+            "altloc" : [],   "chains" : [],   "elements" : [],   "resnames" : [],
         }
-        self._idx_unique_current: dict[str, list[str]] = {
-            "chains" : 0,  "elements" : 0,  "resnames" : 0,
+        self._idxs_uniques: dict[str, int | None] = {
+            "altloc" : None, "chains" : None, "elements" : None, "resnames" : None,
         }
 
         self._idxs_chars2idxs_sects = [None for _ in range(ms.LENGTH_RECORD)]
@@ -65,7 +65,6 @@ class MolData:
             self._unique_vals[k] = list(sorted(set(
                 line.get_section_data(name_section) for line in self._lines
             ) - {None}))
-
 
     # --------------------------------------------------------------------------
     def append(self, line: mp.MolLine):
@@ -110,46 +109,62 @@ class MolData:
         return self._idxs_chars2idxs_sects[idx_char]
 
     # --------------------------------------------------------------------------
-    def increment_idx_unique_current(self):
-        key = self.current_unique
-        self._assert_key(key)
-
-        vals = self._unique_vals[key]
-        idx = self._idx_unique_current[key] + 1
-        if idx >= len(vals): idx = 0
-        self._idx_unique_current[key] = idx
+    def prev_column(self):
+        self.current_section = mp.Utils.prev_cyclic(self.current_section, self.nsections)
 
     # --------------------------------------------------------------------------
-    def match_current_unique_char(self, line: mp.MolLine) -> bool:
-        key = self.current_unique
+    def next_column(self):
+        self.current_section = mp.Utils.next_cyclic(self.current_section, self.nsections)
+
+    # --------------------------------------------------------------------------
+    def next_unique(self, key):
         self._assert_key(key)
-
         vals = self._unique_vals[key]
-        idx = self._idx_unique_current[key]
-        ref = vals[idx]
+        self._idxs_uniques[key] = mp.Utils.next_cyclic(
+            self._idxs_uniques[key], len(vals)
+        )
 
-        key_pdb_section = self.UNIQUE_VALS_KEYS[self.current_unique]
-        to_evaluate = line.get_section_data(key_pdb_section)
-        if to_evaluate is None: return False
+    # --------------------------------------------------------------------------
+    def reset_idx_unique(self):
+        for k in self._idxs_uniques.keys():
+            self._idxs_uniques[k] = None
 
-        return to_evaluate.strip() == ref
+    # --------------------------------------------------------------------------
+    def any_unique(self):
+        return any(idx is not None for idx in self._idxs_uniques.values())
 
     # --------------------------------------------------------------------------
     def get_unique_chars_attrs(self, key: str) -> tuple[str, list[int]]:
         self._assert_key(key)
         vals = [v if v else "''" for v in self._unique_vals[key]]
-        idx = self._idx_unique_current[key]
+        idx = self._idxs_uniques[key]
 
         chars = ' '.join(vals)
-        if self.current_unique != key:
-            return chars, pr.A_NORMAL
-
         mask = ' '.join(
             len(v)*('!' if idx == i else ' ')
             for i,v in enumerate(vals)
         )
         attrs = [[pr.A_REVERSE if m == '!' else pr.A_NORMAL for m in mask]]
         return chars, attrs
+
+    # --------------------------------------------------------------------------
+    def match_uniques(self, line: mp.MolLine) -> bool:
+        for key in self._unique_vals.keys():
+            if not self._match_unique(line, key):
+                return False
+        return True
+
+    # --------------------------------------------------------------------------
+    def _match_unique(self, line: mp.MolLine, key: str) -> bool:
+        vals = self._unique_vals[key]
+        idx = self._idxs_uniques[key]
+        if idx is None: return True
+
+        key_pdb_section = self.UNIQUE_VALS_KEYS[key]
+        to_evaluate = line.get_section_data(key_pdb_section)
+        if to_evaluate is None: return False
+
+        return to_evaluate.strip() == vals[idx]
 
     # --------------------------------------------------------------------------
     def _assert_key(self, key: str):
