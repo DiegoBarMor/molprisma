@@ -9,7 +9,7 @@ def read_requirements(path = "requirements.txt"):
 
 setup(
     name="molprisma",
-    version="1.0.0",
+    version="1.0.1",
     description="Tool for fast inspection of PDB molecular files inside the terminal",
     keywords="pdb rcsb molecular terminal tui protein nucleic rna dna ligand",
     long_description=open("README.md").read(),
@@ -19,7 +19,7 @@ setup(
     url="https://github.com/diegobarmor/molprisma",
     license="MIT",
     packages=find_packages(),
-    install_requires=read_requirements(),
+    install_requires=["prismatui==0.3.2"],
     entry_points={
         "console_scripts": [
             "molprisma=molprisma.__main__:main",
