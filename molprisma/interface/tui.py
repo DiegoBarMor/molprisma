@@ -260,9 +260,9 @@ class TUIMolPrisma(pr.Terminal):
 
     # --------------------------------------------------------------------------
     def _reset_filters(self):
-        self._show_meta = True
         self._show_atom = True
         self._show_hete = True
+        self._show_meta = False
         self._mol.reset_filter_idxs()
         self._update_filter_key()
         self._update_pos()
